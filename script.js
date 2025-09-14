@@ -127,14 +127,102 @@ function carregarConfiguracoes() {
 function salvarConfiguracoes() {
     const configuracoes = {
         emailNotificacao: document.getElementById('emailNotificacao').value,
-        diasAlertaVencimento: parseInt(document.getElementById('diasAlertaVencimento').value),
-        limiteEstoqueBaixo: parseInt(document.getElementById('limiteEstoqueBaixo').value),
+        diasAlertaVencimento: parseInt(document.getElementById('diasAlertaVencimento').value) || 30,
+        limiteEstoqueBaixo: parseInt(document.getElementById('limiteEstoqueBaixo').value) || 10,
         backupAuto: document.getElementById('backupAuto').value,
         temaInterface: document.getElementById('temaInterface').value
     };
     
     localStorage.setItem(CONFIGURACOES_DB, JSON.stringify(configuracoes));
     alert('Configurações salvas com sucesso!');
+}
+
+function login() {
+    const userIdInput = document.getElementById('userId').value.trim();
+    const userId = parseInt(userIdInput);
+    
+    // Validação mais robusta
+    if (!userIdInput || isNaN(userId) || userId < 1) {
+        alert('Por favor, digite um ID de usuário válido (número maior que 0).');
+        return;
+    }
+    
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    if (usuarios.length === 0) {
+        console.error('Banco de usuários vazio. Inicializando novamente.');
+        inicializarBancosDeDados();
+        alert('Erro: Banco de usuários estava vazio. Inicializado com usuários padrão. Tente novamente.');
+        return;
+    }
+    
+    const usuario = usuarios.find(u => u.id === userId);
+    
+    if (!usuario) {
+        alert('Usuário não encontrado. Tente IDs padrão (ex: 189 para admin) ou contate o administrador.');
+        console.log('Usuários disponíveis:', usuarios);
+        return;
+    }
+    
+    try {
+        usuarioLogado = usuario;
+        
+        // Atualizar informações do usuário
+        const userNameElement = document.getElementById('userName');
+        const userIdDisplayElement = document.getElementById('userIdDisplay');
+        const userTypeBadgeElement = document.getElementById('userTypeBadge');
+        
+        if (!userNameElement || !userIdDisplayElement || !userTypeBadgeElement) {
+            throw new Error('Elementos da interface não encontrados.');
+        }
+        
+        userNameElement.textContent = usuario.nome;
+        userIdDisplayElement.textContent = usuario.id;
+        
+        // Configurar permissões de administrador
+        if (usuario.tipo === 'admin') {
+            userTypeBadgeElement.innerHTML = '<span class="admin-badge">Admin</span>';
+            document.getElementById('menuUsuarios').style.display = 'block';
+            document.getElementById('menuConfiguracoes').style.display = 'block';
+            document.getElementById('menuRelatorios').style.display = 'block';
+        } else {
+            userTypeBadgeElement.textContent = '';
+            document.getElementById('menuUsuarios').style.display = 'none';
+            document.getElementById('menuConfiguracoes').style.display = 'none';
+            document.getElementById('menuRelatorios').style.display = 'none';
+        }
+        
+        // Alternar visibilidade dos contêineres
+        const loginContainer = document.getElementById('loginContainer');
+        const appContainer = document.getElementById('appContainer');
+        
+        if (!loginContainer || !appContainer) {
+            throw new Error('Contêineres de login ou aplicativo não encontrados.');
+        }
+        
+        loginContainer.style.display = 'none';
+        appContainer.style.display = 'block';
+        
+        // Limpar campo de input
+        document.getElementById('userId').value = '';
+        
+        // Carregar dashboard
+        navigateTo('dashboard');
+        checarAlertasEstoque();
+    } catch (error) {
+        console.error('Erro durante o login:', error);
+        alert('Erro ao realizar login. Verifique o console para detalhes ou contate o suporte.');
+    }
+}
+
+function checarAlertasEstoque() {
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
+    const limiteEstoqueBaixo = configuracoes.limiteEstoqueBaixo || 10;
+    const baixos = medicamentos.filter(m => m.quantidade <= limiteEstoqueBaixo);
+    
+    if (baixos.length > 0) {
+        alert(`Alertas: ${baixos.map(m => m.nome).join(', ')} com estoque baixo (≤${limiteEstoqueBaixo})!`);
+    }
 }
 
 function iniciarScanner(campoId) {
@@ -159,21 +247,21 @@ function iniciarScanner(campoId) {
         };
         
         navigator.mediaDevices.getUserMedia(constraints)
-        .then(function(stream) {
-            video.srcObject = stream;
-            scannerStream = stream;
-            video.play();
-            scannerAtivo = true;
-            scanearCodigo(video);
-        })
-        .catch(function(error) {
-            console.error('Erro ao acessar a câmera:', error);
-            instructions.style.display = 'none';
-            errorDiv.style.display = 'block';
-            scannerAtivo = false;
-            document.getElementById('cameraHelp').style.display = 'block';
-            document.getElementById('cameraHelpRetirar').style.display = 'block';
-        });
+            .then(function(stream) {
+                video.srcObject = stream;
+                scannerStream = stream;
+                video.play();
+                scannerAtivo = true;
+                scanearCodigo(video);
+            })
+            .catch(function(error) {
+                console.error('Erro ao acessar a câmera:', error);
+                instructions.style.display = 'none';
+                errorDiv.style.display = 'block';
+                scannerAtivo = false;
+                document.getElementById('cameraHelp').style.display = 'block';
+                document.getElementById('cameraHelpRetirar').style.display = 'block';
+            });
     } else {
         alert('Seu navegador não suporta acesso à câmera.');
         instructions.style.display = 'none';
@@ -252,46 +340,6 @@ function simularScan(campoId) {
     
     document.getElementById('cameraHelp').style.display = 'none';
     document.getElementById('cameraHelpRetirar').style.display = 'none';
-}
-
-function login() {
-    const userId = parseInt(document.getElementById('userId').value);
-    
-    if (!userId || userId < 1) {
-        alert('Por favor, digite um ID de usuário válido.');
-        return;
-    }
-    
-    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
-    const usuario = usuarios.find(u => u.id === userId);
-    
-    if (!usuario) {
-        alert('Usuário não encontrado. Entre em contato com o administrador.');
-        return;
-    }
-    
-    usuarioLogado = usuario;
-    
-    document.getElementById('userName').textContent = usuario.nome;
-    document.getElementById('userIdDisplay').textContent = usuario.id;
-    
-    if (usuario.tipo === 'admin') {
-        document.getElementById('userTypeBadge').innerHTML = '<span class="admin-badge">Admin</span>';
-        document.getElementById('menuUsuarios').style.display = 'block';
-        document.getElementById('menuConfiguracoes').style.display = 'block';
-        document.getElementById('menuRelatorios').style.display = 'block';
-    } else {
-        document.getElementById('userTypeBadge').textContent = '';
-        document.getElementById('menuUsuarios').style.display = 'none';
-        document.getElementById('menuConfiguracoes').style.display = 'none';
-        document.getElementById('menuRelatorios').style.display = 'none';
-    }
-    
-    document.getElementById('loginContainer').style.display = 'none';
-    document.getElementById('appContainer').style.display = 'block';
-    
-    atualizarDashboard();
-    checarAlertasEstoque();
 }
 
 function logout() {
@@ -451,7 +499,7 @@ function atualizarTabelaMovimentacoes() {
             <td>${mov.quantidade}</td>
             <td>R$ ${mov.valorTotal.toFixed(2)}</td>
             <td>${usuario ? usuario.nome : 'Desconhecido'}</td>
-            <td>${mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}</td>
+            <td>${mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'devolucao' ? 'Devolução' : 'Saída'}</td>
         `;
         
         tbody.appendChild(tr);
@@ -460,7 +508,7 @@ function atualizarTabelaMovimentacoes() {
 
 function formatarData(dataString) {
     const data = new Date(dataString);
-    return data.toLocaleDateString('pt-BR');
+    return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function calcularValorUnitario() {
@@ -476,14 +524,14 @@ function calcularValorUnitario() {
 }
 
 function cadastrarMedicamento() {
-    const codigo = document.getElementById('codigoBarras').value;
-    const nome = document.getElementById('nomeMedicamento').value;
-    const fabricante = document.getElementById('fabricante').value;
-    const lote = document.getElementById('lote').value;
+    const codigo = document.getElementById('codigoBarras').value.trim();
+    const nome = document.getElementById('nomeMedicamento').value.trim();
+    const fabricante = document.getElementById('fabricante').value.trim();
+    const lote = document.getElementById('lote').value.trim();
     const quantidade = parseInt(document.getElementById('quantidade').value);
     const valorTotal = parseFloat(document.getElementById('valorTotal').value);
     const validade = document.getElementById('validade').value;
-    const observacoes = document.getElementById('observacoes').value;
+    const observacoes = document.getElementById('observacoes').value.trim();
     
     if (!codigo || !nome || !fabricante || !lote || !quantidade || !valorTotal || !validade) {
         alert('Por favor, preencha todos os campos obrigatórios.');
@@ -545,7 +593,6 @@ function buscarMedicamentoPorCodigo(codigo) {
         document.getElementById('loteRetirada').value = medicamento.lote;
         document.getElementById('valorUnitarioRetirada').value = medicamento.valorUnitario.toFixed(2);
         document.getElementById('quantidadeRetirada').max = medicamento.quantidade;
-        
         calcularValorTotalRetirada();
     } else {
         document.getElementById('medicamentoRetirada').value = '';
@@ -553,7 +600,6 @@ function buscarMedicamentoPorCodigo(codigo) {
         document.getElementById('valorUnitarioRetirada').value = '';
         document.getElementById('quantidadeRetirada').value = '';
         document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
-        
         alert('Medicamento não encontrado. Verifique o código de barras.');
     }
 }
@@ -578,7 +624,7 @@ function toggleMotivoField() {
 }
 
 function processarMovimentacao() {
-    const codigo = document.getElementById('retirarCodigo').value;
+    const codigo = document.getElementById('retirarCodigo').value.trim();
     const quantidade = parseInt(document.getElementById('quantidadeRetirada').value);
     const tipo = document.getElementById('tipoMovimentacao').value;
     const motivo = document.getElementById('motivoRetirada').value;
@@ -659,8 +705,44 @@ function registrarMovimentacao(medicamentoId, tipo, quantidade, valorUnitario, m
     localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(movimentacoes));
 }
 
+function enviarEmailAlerta(medicamento) {
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
+    const email = configuracoes.emailNotificacao;
+
+    if (!email) {
+        alert('Configure o email de notificação nas configurações.');
+        return;
+    }
+
+    const templateParams = {
+        medicamento_nome: medicamento.nome,
+        quantidade: medicamento.quantidade,
+        email_to: email
+    };
+
+    emailjs.send("YOUR_SERVICE_ID", "YOUR_TEMPLATE_ID", templateParams)
+        .then(function(response) {
+            alert('Email enviado com sucesso!');
+        }, function(error) {
+            console.error('Erro ao enviar email:', error);
+            alert('Erro ao enviar email. Verifique a configuração.');
+        });
+}
+
+function confirmarEnvioEmail() {
+    if (medicamentoAlerta) {
+        enviarEmailAlerta(medicamentoAlerta);
+        medicamentoAlerta = null;
+    }
+    closeAlert();
+}
+
+function closeAlert() {
+    document.getElementById('alertModal').style.display = 'none';
+}
+
 function filtrarMedicamentos() {
-    const termo = document.getElementById('pesquisaTermo').value.toLowerCase();
+    const termo = document.getElementById('pesquisaTermo').value.toLowerCase().trim();
     const status = document.getElementById('filtroStatus').value;
     const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
     const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
@@ -820,7 +902,7 @@ function gerarRelatorio() {
             thead = '<tr><th>Data</th><th>Medicamento</th><th>Quantidade</th><th>Tipo</th><th>Motivo</th></tr>';
             tbody = filteredMovimentacoes.map(mov => {
                 const med = medicamentos.find(m => m.id === mov.medicamentoId);
-                return `<tr><td>${formatarData(mov.data)}</td><td>${med ? med.nome : 'Desconhecido'}</td><td>${mov.quantidade}</td><td>${mov.tipo}</td><td>${mov.motivo}</td></tr>`;
+                return `<tr><td>${formatarData(mov.data)}</td><td>${med ? med.nome : 'Desconhecido'}</td><td>${mov.quantidade}</td><td>${mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'devolucao' ? 'Devolução' : 'Saída'}</td><td>${mov.motivo}</td></tr>`;
             }).join('');
             resumo.innerHTML = `Total de movimentações: ${filteredMovimentacoes.length}`;
             break;
@@ -839,3 +921,221 @@ function gerarRelatorio() {
                 } else if (med.quantidade <= (configuracoes.limiteEstoqueBaixo || 10)) {
                     status = 'Estoque Baixo';
                     statusClass = 'badge-warning';
+                }
+                return `<tr><td>${med.nome}</td><td>${med.quantidade}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
+            }).join('');
+            resumo.innerHTML = `Total em estoque: ${medicamentos.reduce((sum, m) => sum + m.quantidade, 0)}`;
+            break;
+        case 'vencimentos':
+            thead = '<tr><th>Nome</th><th>Validade</th><th>Dias Restantes</th></tr>';
+            const vencendo = medicamentos.filter(med => {
+                const dataValidade = new Date(med.dataValidade);
+                return dataValidade <= new Date(hoje.getTime() + (configuracoes.diasAlertaVencimento || 30) * 24 * 60 * 60 * 1000);
+            });
+            tbody = vencendo.map(med => {
+                const dias = Math.floor((new Date(med.dataValidade) - hoje) / (24 * 60 * 60 * 1000));
+                return `<tr><td>${med.nome}</td><td>${formatarData(med.dataValidade)}</td><td>${dias}</td></tr>`;
+            }).join('');
+            resumo.innerHTML = `Próximos vencimentos: ${vencendo.length}`;
+            break;
+        case 'valor':
+            thead = '<tr><th>Nome</th><th>Valor Total</th></tr>';
+            tbody = medicamentos.map(med => `<tr><td>${med.nome}</td><td>R$ ${(med.quantidade * med.valorUnitario).toFixed(2)}</td></tr>`).join('');
+            resumo.innerHTML = `Valor total: R$ ${medicamentos.reduce((sum, m) => sum + (med.quantidade * med.valorUnitario), 0).toFixed(2)}`;
+            break;
+    }
+
+    tabela.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
+
+    if (relatorioChart) relatorioChart.destroy();
+    const ctx = document.getElementById('relatorioChart').getContext('2d');
+    relatorioChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: medicamentos.map(m => m.nome),
+            datasets: [{
+                label: tipo === 'valor' ? 'Valor em Estoque (R$)' : 'Quantidade',
+                data: tipo === 'valor' ? medicamentos.map(m => m.quantidade * m.valorUnitario) : medicamentos.map(m => m.quantidade),
+                backgroundColor: 'rgba(26, 79, 114, 0.5)',
+                borderColor: 'rgba(26, 79, 114, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function exportarRelatorio() {
+    const rows = Array.from(document.getElementById('tabelaRelatorio').querySelectorAll('tr'));
+    const csv = rows.map(row => Array.from(row.querySelectorAll('th, td')).map(cell => `"${cell.textContent.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'relatorio.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function limparDadosAntigos() {
+    if (!confirm('Confirma a exclusão de movimentações com mais de 1 ano?')) return;
+    const umAnoAtras = new Date();
+    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
+    let movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    movimentacoes = movimentacoes.filter(mov => new Date(mov.data) > umAnoAtras);
+    localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(movimentacoes));
+    alert('Dados antigos limpos com sucesso!');
+    atualizarDashboard();
+}
+
+function recalcularEstoque() {
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    medicamentos.forEach(med => {
+        const movs = movimentacoes.filter(m => m.medicamentoId === med.id);
+        med.quantidade = movs.reduce((qty, mov) => qty + (mov.tipo === 'entrada' || mov.tipo === 'devolucao' ? mov.quantidade : -mov.quantidade), 0);
+    });
+    localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos));
+    alert('Estoque recalculado com sucesso!');
+    atualizarDashboard();
+}
+
+function carregarUsuarios() {
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    const tbody = document.getElementById('tabelaUsuarios').querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    usuarios.forEach(usuario => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${usuario.id}</td>
+            <td>${usuario.nome}</td>
+            <td>${usuario.tipo === 'admin' ? 'Administrador' : 'Usuário Comum'}</td>
+            <td>${formatarData(usuario.dataCriacao)}</td>
+            <td>
+                <button class="action-btn btn-danger" onclick="excluirUsuario(${usuario.id})">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function cadastrarUsuario() {
+    const id = parseInt(document.getElementById('novoUsuarioId').value);
+    const nome = document.getElementById('novoUsuarioNome').value.trim();
+    const tipo = document.getElementById('novoUsuarioTipo').value;
+    
+    if (!id || !nome || isNaN(id) || id < 1) {
+        alert('Por favor, preencha ID e nome do usuário corretamente.');
+        return;
+    }
+    
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    
+    if (usuarios.some(u => u.id === id)) {
+        alert('Já existe um usuário com este ID.');
+        return;
+    }
+    
+    usuarios.push({
+        id,
+        nome,
+        tipo,
+        dataCriacao: new Date().toISOString()
+    });
+    
+    localStorage.setItem(USUARIOS_DB, JSON.stringify(usuarios));
+    
+    document.getElementById('novoUsuarioId').value = '';
+    document.getElementById('novoUsuarioNome').value = '';
+    document.getElementById('novoUsuarioTipo').value = 'comum';
+    
+    alert('Usuário cadastrado com sucesso!');
+    carregarUsuarios();
+}
+
+function excluirUsuario(id) {
+    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    const usuariosAtualizados = usuarios.filter(u => u.id !== id);
+    
+    localStorage.setItem(USUARIOS_DB, JSON.stringify(usuariosAtualizados));
+    
+    alert('Usuário excluído com sucesso!');
+    carregarUsuarios();
+}
+
+function fazerBackup() {
+    const data = {
+        medicamentos: JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [],
+        usuarios: JSON.parse(localStorage.getItem(USUARIOS_DB)) || [],
+        movimentacoes: JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [],
+        configuracoes: JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {}
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    alert('Backup realizado com sucesso!');
+}
+
+function restaurarBackup() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (data.medicamentos) localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(data.medicamentos));
+                if (data.usuarios) localStorage.setItem(USUARIOS_DB, JSON.stringify(data.usuarios));
+                if (data.movimentacoes) localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(data.movimentacoes));
+                if (data.configuracoes) localStorage.setItem(CONFIGURACOES_DB, JSON.stringify(data.configuracoes));
+                
+                alert('Backup restaurado com sucesso!');
+                atualizarDashboard();
+                carregarUsuarios();
+                carregarConfiguracoes();
+            } catch (error) {
+                console.error('Erro ao restaurar backup:', error);
+                alert('Erro ao restaurar backup. Verifique o arquivo.');
+            }
+        };
+        reader.readAsText(file);
+    };
+    
+    input.click();
+}
+
+window.onload = function() {
+    inicializarBancosDeDados();
+    document.getElementById('loginContainer').style.display = 'flex';
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('userId').focus();
+    
+    document.querySelectorAll('.menu li').forEach(item => {
+        if (item.dataset.module && item.dataset.module !== 'sair') {
+            item.addEventListener('click', () => navigateTo(item.dataset.module));
+        }
+    });
+};

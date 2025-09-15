@@ -214,14 +214,20 @@ async function salvarConfiguracoes() {
 function showLoading() {
   const loadingOverlay = document.getElementById('loadingOverlay');
   if (loadingOverlay) {
+    console.log('Mostrando loading overlay');
     loadingOverlay.style.display = 'flex';
+  } else {
+    console.error('Elemento loadingOverlay não encontrado no DOM');
   }
 }
 
 function hideLoading() {
   const loadingOverlay = document.getElementById('loadingOverlay');
   if (loadingOverlay) {
+    console.log('Ocultando loading overlay');
     loadingOverlay.style.display = 'none';
+  } else {
+    console.error('Elemento loadingOverlay não encontrado no DOM');
   }
 }
 
@@ -265,7 +271,7 @@ async function login() {
     const userTypeBadgeElement = document.getElementById('userTypeBadge');
     
     if (!userNameElement || !userIdDisplayElement || !userTypeBadgeElement) {
-      throw new Error('Elementos da interface não encontrados.');
+      throw new Error('Elementos da interface (userName, userIdDisplay, userTypeBadge) não encontrados.');
     }
     
     userNameElement.textContent = usuario.nome;
@@ -310,11 +316,11 @@ async function login() {
     await mostrarFotoUsuario(usuario);
     await navigateTo('dashboard');
     await checarAlertasEstoque();
-    hideLoading();
   } catch (error) {
-    hideLoading();
     console.error('Erro durante o login:', error);
     alert('Erro ao realizar login. Verifique o console para detalhes ou contate o suporte.');
+  } finally {
+    hideLoading(); // Garante que o loading seja oculto mesmo em caso de erro
   }
 }
 
@@ -402,6 +408,7 @@ async function atualizarPorcentagemArmazenamento() {
 async function navigateTo(moduleId) {
   showLoading();
   try {
+    console.log(`Navegando para módulo: ${moduleId}`);
     document.querySelectorAll('.module').forEach(module => {
       module.classList.remove('active');
     });
@@ -409,7 +416,7 @@ async function navigateTo(moduleId) {
     document.querySelectorAll('.menu li').forEach(item => {
       item.classList.remove('active');
     });
-    
+
     const moduleElement = document.getElementById(moduleId);
     const menuItem = document.querySelector(`.menu li[data-module="${moduleId}"]`);
     
@@ -443,7 +450,7 @@ async function navigateTo(moduleId) {
     console.error(`Erro ao navegar para ${moduleId}:`, error);
     alert('Erro ao carregar módulo. Verifique o console.');
   } finally {
-    hideLoading();
+    hideLoading(); // Garante que o loading seja oculto mesmo em caso de erro
   }
 }
 
@@ -546,28 +553,6 @@ function scanearCodigo(video) {
       document.getElementById('scannerError').style.display = 'block';
     }
   });
-}
-
-function simularScan(campoId) {
-  const codigos = [
-    '7891234567890',
-    '7899876543210',
-    '7896655443322',
-    '7896666666666',
-    '7897777777777'
-  ];
-  
-  const codigoAleatorio = codigos[Math.floor(Math.random() * codigos.length)];
-  document.getElementById(campoId).value = codigoAleatorio;
-  
-  if (campoId === 'retirarCodigo') {
-    buscarMedicamentoPorCodigo(codigoAleatorio);
-  } else if (campoId === 'codigoBarras') {
-    buscarMedicamentoPorCodigoParaPreencher(codigoAleatorio);
-  }
-  
-  document.getElementById('cameraHelp').style.display = 'none';
-  document.getElementById('cameraHelpRetirar').style.display = 'none';
 }
 
 async function buscarMedicamentoPorCodigo(codigo) {
@@ -1080,7 +1065,7 @@ async function filtrarMedicamentos() {
             statusClass = 'badge-success';
           }
         }
-        
+
         tr.innerHTML = `
           <td>${med.codigo}</td>
           <td>${med.nome}</td>
@@ -1090,14 +1075,7 @@ async function filtrarMedicamentos() {
           <td>R$ ${med.valorUnitario.toFixed(2)}</td>
           <td>${formatarData(med.dataValidade)}</td>
           <td><span class="badge ${statusClass}">${statusText}</span></td>
-          <td>
-            <button class="action-btn" onclick="detalhesMedicamento(${med.id})">
-              <i class="fas fa-eye"></i>
-            </button>
-            <button class="action-btn btn-danger" onclick="excluirMedicamento(${med.id})">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
+          <td><button onclick="iniciarRetirada('${med.codigo}')">Retirar</button></td>
         `;
         
         tbody.appendChild(tr);
@@ -1105,50 +1083,23 @@ async function filtrarMedicamentos() {
     });
   } catch (error) {
     console.error('Erro ao filtrar medicamentos:', error);
-    alert('Erro ao carregar lista de medicamentos. Verifique o console.');
+    alert('Erro ao filtrar medicamentos. Verifique o console.');
   }
 }
 
-async function detalhesMedicamento(id) {
-  try {
-    const medicamentos = await getItem(MEDICAMENTOS_DB) || [];
-    const medicamento = medicamentos.find(m => m.id === id);
-    
-    if (medicamento) {
-      alert(`Detalhes do Medicamento:\n\nNome: ${medicamento.nome}\nCódigo: ${medicamento.codigo}\nFabricante: ${medicamento.fabricante}\nLote: ${medicamento.lote}\nQuantidade: ${medicamento.quantidade}\nValor Unitário: R$ ${medicamento.valorUnitario.toFixed(2)}\nValidade: ${formatarData(medicamento.dataValidade)}\nObservações: ${medicamento.observacoes || 'Nenhuma'}`);
-    }
-  } catch (error) {
-    console.error('Erro ao mostrar detalhes do medicamento:', error);
-    alert('Erro ao carregar detalhes do medicamento. Verifique o console.');
-  }
-}
-
-async function excluirMedicamento(id) {
-  if (!confirm('Tem certeza que deseja excluir este medicamento?')) return;
-  
-  try {
-    let medicamentos = await getItem(MEDICAMENTOS_DB) || [];
-    const medicamentosAtualizados = medicamentos.filter(m => m.id !== id);
-    
-    await setItem(MEDICAMENTOS_DB, medicamentosAtualizados);
-    
-    alert('Medicamento excluído com sucesso!');
-    await filtrarMedicamentos();
-    await atualizarDashboard();
-  } catch (error) {
-    console.error('Erro ao excluir medicamento:', error);
-    alert('Erro ao excluir medicamento. Verifique o console.');
-  }
+function iniciarRetirada(codigo) {
+  document.getElementById('retirarCodigo').value = codigo;
+  buscarMedicamentoPorCodigo(codigo);
+  navigateTo('retirar');
 }
 
 function mudarTipoRelatorio() {
   const tipo = document.getElementById('tipoRelatorio')?.value;
+  const periodo = document.getElementById('periodoRelatorio')?.value;
   const periodoPersonalizado = document.getElementById('periodoPersonalizado');
   
-  if (tipo && periodoPersonalizado && document.getElementById('periodoRelatorio')?.value === 'personalizado') {
-    periodoPersonalizado.style.display = 'block';
-  } else if (periodoPersonalizado) {
-    periodoPersonalizado.style.display = 'none';
+  if (periodoPersonalizado) {
+    periodoPersonalizado.style.display = periodo === 'personalizado' ? 'block' : 'none';
   }
 }
 
@@ -1156,356 +1107,44 @@ async function gerarRelatorio() {
   try {
     const tipo = document.getElementById('tipoRelatorio')?.value;
     const periodo = document.getElementById('periodoRelatorio')?.value;
-    let dataInicio, dataFim;
-
-    const hoje = new Date();
-    if (periodo === 'personalizado') {
-      dataInicio = new Date(document.getElementById('dataInicio')?.value);
-      dataFim = new Date(document.getElementById('dataFim')?.value);
-      if (!dataInicio || !dataFim || dataInicio > dataFim) {
-        alert('Por favor, selecione um período válido.');
-        return;
-      }
-    } else {
-      dataInicio = new Date(hoje);
-      dataInicio.setDate(hoje.getDate() - parseInt(periodo));
-      dataFim = hoje;
-    }
-
+    const dataInicio = document.getElementById('dataInicio')?.value;
+    const dataFim = document.getElementById('dataFim')?.value;
     const medicamentos = await getItem(MEDICAMENTOS_DB) || [];
     const movimentacoes = await getItem(MOVIMENTACOES_DB) || [];
-    const configuracoes = await getItem(CONFIGURACOES_DB) || {};
+    const usuarios = await getItem(USUARIOS_DB) || [];
 
-    const filteredMovimentacoes = movimentacoes.filter(mov => {
-      const dataMov = new Date(mov.data);
-      return dataMov >= dataInicio && dataMov <= dataFim;
-    });
+    let dadosFiltrados = movimentacoes;
+    const hoje = new Date();
 
-    const tabela = document.getElementById('tabelaRelatorio');
-    const resumo = document.getElementById('conteudoResumo');
-    if (!tabela || !resumo) throw new Error('Elementos do relatório não encontrados');
-
-    tabela.innerHTML = '';
-    resumo.innerHTML = '';
-
-    let thead, tbody;
-
-    switch (tipo) {
-      case 'movimentacoes':
-        thead = '<tr><th>Data</th><th>Medicamento</th><th>Quantidade</th><th>Tipo</th><th>Motivo</th></tr>';
-        tbody = filteredMovimentacoes.map(mov => {
-          const med = medicamentos.find(m => m.id === mov.medicamentoId);
-          return `<tr><td>${formatarData(mov.data)}</td><td>${med ? med.nome : 'Desconhecido'}</td><td>${mov.quantidade}</td><td>${mov.tipo === 'entrada' ? 'Entrada' : mov.tipo === 'devolucao' ? 'Devolução' : 'Saída'}</td><td>${mov.motivo}</td></tr>`;
-        }).join('');
-        resumo.innerHTML = `Total de movimentações: ${filteredMovimentacoes.length}`;
-        break;
-      case 'estoque':
-        thead = '<tr><th>Nome</th><th>Quantidade</th><th>Status</th></tr>';
-        tbody = medicamentos.map(med => {
-          const dataValidade = new Date(med.dataValidade);
-          let status = 'Disponível';
-          let statusClass = 'badge-success';
-          if (dataValidade < hoje) {
-            status = 'Vencido';
-            statusClass = 'badge-danger';
-          } else if (Math.floor((dataValidade - hoje) / (1000 * 60 * 60 * 24)) <= (configuracoes.diasAlertaVencimento || 30)) {
-            status = 'Vencendo';
-            statusClass = 'badge-warning';
-          } else if (med.quantidade <= (configuracoes.limiteEstoqueBaixo || 10)) {
-            status = 'Estoque Baixo';
-            statusClass = 'badge-warning';
-          }
-          return `<tr><td>${med.nome}</td><td>${med.quantidade}</td><td><span class="badge ${statusClass}">${status}</span></td></tr>`;
-        }).join('');
-        resumo.innerHTML = `Total em estoque: ${medicamentos.reduce((sum, m) => sum + m.quantidade, 0)}`;
-        break;
-      case 'vencimentos':
-        thead = '<tr><th>Nome</th><th>Validade</th><th>Dias Restantes</th></tr>';
-        const vencendo = medicamentos.filter(med => {
-          const dataValidade = new Date(med.dataValidade);
-          return dataValidade <= new Date(hoje.getTime() + (configuracoes.diasAlertaVencimento || 30) * 24 * 60 * 60 * 1000);
-        });
-        tbody = vencendo.map(med => {
-          const dias = Math.floor((new Date(med.dataValidade) - hoje) / (24 * 60 * 60 * 1000));
-          return `<tr><td>${med.nome}</td><td>${formatarData(med.dataValidade)}</td><td>${dias}</td></tr>`;
-        }).join('');
-        resumo.innerHTML = `Próximos vencimentos: ${vencendo.length}`;
-        break;
-      case 'valor':
-        thead = '<tr><th>Nome</th><th>Valor Total</th></tr>';
-        tbody = medicamentos.map(med => `<tr><td>${med.nome}</td><td>R$ ${(med.quantidade * med.valorUnitario).toFixed(2)}</td></tr>`).join('');
-        resumo.innerHTML = `Valor total: R$ ${medicamentos.reduce((sum, m) => sum + (m.quantidade * m.valorUnitario), 0).toFixed(2)}`;
-        break;
-    }
-
-    tabela.innerHTML = `<thead>${thead}</thead><tbody>${tbody}</tbody>`;
-
-    if (relatorioChart) relatorioChart.destroy();
-    const ctx = document.getElementById('relatorioChart')?.getContext('2d');
-    if (ctx) {
-      relatorioChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: medicamentos.map(m => m.nome),
-          datasets: [{
-            label: tipo === 'valor' ? 'Valor em Estoque (R$)' : 'Quantidade',
-            data: tipo === 'valor' ? medicamentos.map(m => m.quantidade * m.valorUnitario) : medicamentos.map(m => m.quantidade),
-            backgroundColor: 'rgba(26, 79, 114, 0.5)',
-            borderColor: 'rgba(26, 79, 114, 1)',
-            borderWidth: 1
-          }]
-        },
-        options: {
-          scales: {
-            y: {
-              beginAtZero: true
-            }
-          }
-        }
+    if (periodo !== 'personalizado') {
+      const dias = parseInt(periodo);
+      const dataLimite = new Date(hoje);
+      dataLimite.setDate(hoje.getDate() - dias);
+      dadosFiltrados = dadosFiltrados.filter(mov => new Date(mov.data) >= dataLimite);
+    } else if (dataInicio && dataFim) {
+      const inicio = new Date(dataInicio);
+      const fim = new Date(dataFim);
+      dadosFiltrados = dadosFiltrados.filter(mov => {
+        const dataMov = new Date(mov.data);
+        return dataMov >= inicio && dataMov <= fim;
       });
     }
-  } catch (error) {
-    console.error('Erro ao gerar relatório:', error);
-    alert('Erro ao gerar relatório. Verifique o console.');
-  }
-}
 
-function exportarRelatorio() {
-  try {
-    const rows = Array.from(document.getElementById('tabelaRelatorio')?.querySelectorAll('tr'));
-    const csv = rows.map(row => Array.from(row.querySelectorAll('th, td')).map(cell => `"${cell.textContent.replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'relatorio.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Erro ao exportar relatório:', error);
-    alert('Erro ao exportar relatório. Verifique o console.');
-  }
-}
+    const tbody = document.getElementById('tabelaRelatorio') || document.createElement('table');
+    tbody.id = 'tabelaRelatorio';
+    tbody.innerHTML = `<thead><tr><th>Data</th><th>Medicamento</th><th>Quantidade</th><th>Valor Total</th><th>Usuário</th><th>Tipo</th></tr></thead><tbody></tbody>`;
+    const conteudoResumo = document.getElementById('conteudoResumo') || document.createElement('div');
+    conteudoResumo.id = 'conteudoResumo';
 
-async function limparDadosAntigos() {
-  if (!confirm('Confirma a exclusão de movimentações com mais de 1 ano?')) return;
-  try {
-    let movimentacoes = await getItem(MOVIMENTACOES_DB) || [];
-    const umAnoAtras = new Date();
-    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
-    movimentacoes = movimentacoes.filter(mov => new Date(mov.data) > umAnoAtras);
-    await setItem(MOVIMENTACOES_DB, movimentacoes);
-    alert('Dados antigos limpos com sucesso!');
-    await atualizarDashboard();
-  } catch (error) {
-    console.error('Erro ao limpar dados antigos:', error);
-    alert('Erro ao limpar dados antigos. Verifique o console.');
-  }
-}
+    let dadosChart = [];
+    let labelsChart = [];
 
-async function recalcularEstoque() {
-  try {
-    let medicamentos = await getItem(MEDICAMENTOS_DB) || [];
-    const movimentacoes = await getItem(MOVIMENTACOES_DB) || [];
-    medicamentos.forEach(med => {
-      const movs = movimentacoes.filter(m => m.medicamentoId === med.id);
-      med.quantidade = movs.reduce((qty, mov) => qty + (mov.tipo === 'entrada' || mov.tipo === 'devolucao' ? mov.quantidade : -mov.quantidade), 0);
-    });
-    await setItem(MEDICAMENTOS_DB, medicamentos);
-    alert('Estoque recalculado com sucesso!');
-    await atualizarDashboard();
-  } catch (error) {
-    console.error('Erro ao recalcular estoque:', error);
-    alert('Erro ao recalcular estoque. Verifique o console.');
-  }
-}
-
-async function carregarUsuarios() {
-  try {
-    const usuarios = await getItem(USUARIOS_DB) || [];
-    const tbody = document.getElementById('tabelaUsuarios')?.querySelector('tbody');
-    if (!tbody) throw new Error('Tabela de usuários não encontrada');
-    
-    tbody.innerHTML = '';
-    
-    usuarios.forEach(usuario => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${usuario.id}</td>
-        <td>${usuario.nome}</td>
-        <td>${usuario.tipo === 'admin' ? 'Administrador' : 'Usuário Comum'}</td>
-        <td>${formatarData(usuario.dataCriacao)}</td>
-        <td>
-          <button class="action-btn btn-danger" onclick="excluirUsuario(${usuario.id})">
-            <i class="fas fa-trash"></i>
-          </button>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-  } catch (error) {
-    console.error('Erro ao carregar usuários:', error);
-    alert('Erro ao carregar lista de usuários. Verifique o console.');
-  }
-}
-
-async function cadastrarUsuario() {
-  try {
-    const id = parseInt(document.getElementById('novoUsuarioId')?.value);
-    const nome = document.getElementById('novoUsuarioNome')?.value.trim();
-    const tipo = document.getElementById('novoUsuarioTipo')?.value;
-    
-    if (!id || !nome || isNaN(id) || id < 1) {
-      alert('Por favor, preencha ID e nome do usuário corretamente.');
-      return;
-    }
-    
-    let usuarios = await getItem(USUARIOS_DB) || [];
-    
-    if (usuarios.some(u => u.id === id)) {
-      alert('Já existe um usuário com este ID.');
-      return;
-    }
-    
-    usuarios.push({
-      id,
-      nome,
-      tipo,
-      dataCriacao: new Date().toISOString(),
-      foto: null
-    });
-    
-    await setItem(USUARIOS_DB, usuarios);
-    
-    document.getElementById('novoUsuarioId').value = '';
-    document.getElementById('novoUsuarioNome').value = '';
-    document.getElementById('novoUsuarioTipo').value = 'comum';
-    
-    alert('Usuário cadastrado com sucesso!');
-    await carregarUsuarios();
-  } catch (error) {
-    console.error('Erro ao cadastrar usuário:', error);
-    alert('Erro ao cadastrar usuário. Verifique o console.');
-  }
-}
-
-async function excluirUsuario(id) {
-  if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
-  
-  try {
-    let usuarios = await getItem(USUARIOS_DB) || [];
-    const usuariosAtualizados = usuarios.filter(u => u.id !== id);
-    
-    await setItem(USUARIOS_DB, usuariosAtualizados);
-    
-    alert('Usuário excluído com sucesso!');
-    await carregarUsuarios();
-  } catch (error) {
-    console.error('Erro ao excluir usuário:', error);
-    alert('Erro ao excluir usuário. Verifique o console.');
-  }
-}
-
-async function fazerBackup() {
-  try {
-    const data = {
-      medicamentos: await getItem(MEDICAMENTOS_DB) || [],
-      usuarios: await getItem(USUARIOS_DB) || [],
-      movimentacoes: await getItem(MOVIMENTACOES_DB) || [],
-      configuracoes: await getItem(CONFIGURACOES_DB) || {}
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `backup_${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    alert('Backup realizado com sucesso!');
-  } catch (error) {
-    console.error('Erro ao fazer backup:', error);
-    alert('Erro ao realizar backup. Verifique o console.');
-  }
-}
-
-async function restaurarBackup() {
-  try {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = async function(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = async function(e) {
-        try {
-          const data = JSON.parse(e.target.result);
-          
-          if (data.medicamentos) await setItem(MEDICAMENTOS_DB, data.medicamentos);
-          if (data.usuarios) await setItem(USUARIOS_DB, data.usuarios);
-          if (data.movimentacoes) await setItem(MOVIMENTACOES_DB, data.movimentacoes);
-          if (data.configuracoes) await setItem(CONFIGURACOES_DB, data.configuracoes);
-          
-          alert('Backup restaurado com sucesso!');
-          await atualizarDashboard();
-          await carregarUsuarios();
-          await carregarConfiguracoes();
-        } catch (error) {
-          console.error('Erro ao restaurar backup:', error);
-          alert('Erro ao restaurar backup. Verifique o arquivo.');
-        }
-      };
-      reader.readAsText(file);
-    };
-    
-    input.click();
-  } catch (error) {
-    console.error('Erro ao iniciar restauração de backup:', error);
-    alert('Erro ao iniciar restauração de backup. Verifique o console.');
-  }
-}
-
-window.onload = async function() {
-  try {
-    await inicializarBancosDeDados();
-    const loginContainer = document.getElementById('loginContainer');
-    const appContainer = document.getElementById('appContainer');
-    if (loginContainer && appContainer) {
-      loginContainer.style.display = 'flex';
-      appContainer.style.display = 'none';
-      document.getElementById('userId').focus();
-    }
-    
-    document.querySelectorAll('.menu li').forEach(item => {
-      if (item.dataset.module && item.dataset.module !== 'sair') {
-        item.addEventListener('click', () => navigateTo(item.dataset.module));
-      }
-    });
-    
-    toggleMotivoField();
-    mudarTipoRelatorio();
-    
-    // Adicionar botão voltar no header
-    const header = document.querySelector('.header');
-    if (header) {
-      const backBtn = document.createElement('button');
-      backBtn.textContent = 'Voltar';
-      backBtn.onclick = navigateBack;
-      header.insertBefore(backBtn, header.firstChild);
-    }
-    
-    // Adicionar evento de Enter para login
-    document.getElementById('userId').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        login();
-      }
-    });
-  } catch (error) {
-    console.error('Erro ao inicializar o sistema:', error);
-    alert('Erro ao inicializar o sistema. Verifique o console ou tente outro navegador.');
-  }
-};
+    switch(tipo) {
+      case 'movimentacoes':
+        dadosFiltrados.forEach(mov => {
+          const medicamento = medicamentos.find(m => m.id === mov.medicamentoId);
+          const usuario = usuarios.find(u => u.id === mov.usuarioId);
+          tbody.querySelector('tbody').innerHTML += `
+            <tr>
+              <td>${formatarData(mov.data)}</td>
+             

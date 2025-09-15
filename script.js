@@ -1147,4 +1147,375 @@ async function gerarRelatorio() {
           tbody.querySelector('tbody').innerHTML += `
             <tr>
               <td>${formatarData(mov.data)}</td>
+                            <td>${medicamento ? medicamento.nome : 'Desconhecido'}</td>
+              <td>${mov.quantidade}</td>
+              <td>R$ ${mov.valorTotal.toFixed(2)}</td>
+              <td>${usuario ? usuario.nome : 'Desconhecido'}</td>
+              <td>${mov.tipo}</td>
+            </tr>
+          `;
+        });
+        conteudoResumo.innerHTML = `<p>Total de movimentações: ${dadosFiltrados.length}</p>`;
+        dadosChart = dadosFiltrados.map(mov => mov.quantidade);
+        labelsChart = dadosFiltrados.map(mov => {
+          const med = medicamentos.find(m => m.id === mov.medicamentoId);
+          return med ? med.nome : 'Desconhecido';
+        });
+        break;
+
+      case 'estoque':
+        const estoque = medicamentos.map(med => ({
+          nome: med.nome,
+          quantidade: med.quantidade,
+          valorTotal: med.quantidade * med.valorUnitario
+        }));
+        estoque.forEach(item => {
+          tbody.querySelector('tbody').innerHTML += `
+            <tr>
+              <td>${item.nome}</td>
+              <td>${item.quantidade}</td>
+              <td>R$ ${item.valorTotal.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+        conteudoResumo.innerHTML = `<p>Total em estoque: R$ ${estoque.reduce((total, item) => total + item.valorTotal, 0).toFixed(2)}</p>`;
+        dadosChart = estoque.map(item => item.quantidade);
+        labelsChart = estoque.map(item => item.nome);
+        break;
+
+      case 'vencimentos':
+        const vencimentos = medicamentos.filter(med => {
+          const dataValidade = new Date(med.dataValidade);
+          return dataValidade < hoje || (dataValidade - hoje) / (1000 * 60 * 60 * 24) <= 30;
+        });
+        vencimentos.forEach(med => {
+          tbody.querySelector('tbody').innerHTML += `
+            <tr>
+              <td>${med.nome}</td>
+              <td>${formatarData(med.dataValidade)}</td>
+              <td>${med.quantidade}</td>
+            </tr>
+          `;
+        });
+        conteudoResumo.innerHTML = `<p>Total vencendo ou vencido: ${vencimentos.length}</p>`;
+        dadosChart = vencimentos.map(med => med.quantidade);
+        labelsChart = vencimentos.map(med => med.nome);
+        break;
+
+      case 'valor':
+        const valorPorMedicamento = medicamentos.map(med => ({
+          nome: med.nome,
+          valorTotal: med.quantidade * med.valorUnitario
+        }));
+        valorPorMedicamento.forEach(item => {
+          tbody.querySelector('tbody').innerHTML += `
+            <tr>
+              <td>${item.nome}</td>
+              <td>R$ ${item.valorTotal.toFixed(2)}</td>
+            </tr>
+          `;
+        });
+        conteudoResumo.innerHTML = `<p>Valor total em estoque: R$ ${valorPorMedicamento.reduce((total, item) => total + item.valorTotal, 0).toFixed(2)}</p>`;
+        dadosChart = valorPorMedicamento.map(item => item.valorTotal);
+        labelsChart = valorPorMedicamento.map(item => item.nome);
+        break;
+    }
+
+    const mainContent = document.getElementById('mainContent');
+    if (!document.getElementById('tabelaRelatorio')) {
+      mainContent.appendChild(tbody);
+    }
+    if (!document.getElementById('conteudoResumo')) {
+      mainContent.appendChild(conteudoResumo);
+    }
+
+    if (relatorioChart) {
+      relatorioChart.destroy();
+    }
+    const ctx = document.getElementById('relatorioChart').getContext('2d');
+    relatorioChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labelsChart,
+        datasets: [{
+          label: 'Quantidade/Valor',
+          data: dadosChart,
+          backgroundColor: [
+            '#1a4f72', '#ff6f61', '#6b5b95', '#88b04b', '#f7cac9',
+            '#92a8d1', '#955251', '#b565a7', '#009b77', '#dd4124'
+          ],
+          borderColor: [
+            '#1a4f72', '#ff6f61', '#6b5b95', '#88b04b', '#f7cac9',
+            '#92a8d1', '#955251', '#b565a7', '#009b77', '#dd4124'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: true } }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao gerar relatório:', error);
+    alert('Erro ao gerar relatório. Verifique o console.');
+  }
+}
+
+function exportarRelatorio() {
+  const table = document.getElementById('tabelaRelatorio');
+  if (!table) {
+    alert('Nenhum relatório gerado para exportar.');
+    return;
+  }
+
+  let csv = [];
+  const rows = table.querySelectorAll('tr');
+  
+  rows.forEach(row => {
+    const cols = row.querySelectorAll('td, th');
+    const rowData = Array.from(cols).map(col => `"${col.textContent.trim().replace(/"/g, '""')}"`);
+    csv.push(rowData.join(','));
+  });
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + csv.join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', 'relatorio.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+async function carregarUsuarios() {
+  try {
+    const usuarios = await getItem(USUARIOS_DB) || [];
+    
+    const tbody = document.getElementById('tabelaUsuarios')?.querySelector('tbody');
+    if (!tbody) throw new Error('Tabela de usuários não encontrada');
+    
+    tbody.innerHTML = '';
+    
+    usuarios.forEach(usuario => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${usuario.id}</td>
+        <td>${usuario.nome}</td>
+        <td>${usuario.tipo}</td>
+        <td>${formatarData(usuario.dataCriacao)}</td>
+        <td><button onclick="editarUsuario(${usuario.id})">Editar</button> <button onclick="removerUsuario(${usuario.id})">Remover</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar usuários:', error);
+    alert('Erro ao carregar usuários. Verifique o console.');
+  }
+}
+
+async function cadastrarUsuario() {
+  try {
+    const id = parseInt(document.getElementById('novoUsuarioId')?.value);
+    const nome = document.getElementById('novoUsuarioNome')?.value.trim();
+    const tipo = document.getElementById('novoUsuarioTipo')?.value;
+    
+    if (!id || !nome || !tipo) {
+      alert('Por favor, preencha todos os campos.');
+      return;
+    }
+    
+    let usuarios = await getItem(USUARIOS_DB) || [];
+    
+    if (usuarios.some(u => u.id === id)) {
+      alert('ID já existe. Escolha outro ID.');
+      return;
+    }
+    
+    const novoUsuario = {
+      id,
+      nome,
+      tipo,
+      dataCriacao: new Date().toISOString(),
+      foto: null
+    };
+    
+    usuarios.push(novoUsuario);
+    await setItem(USUARIOS_DB, usuarios);
+    
+    document.getElementById('novoUsuarioId').value = '';
+    document.getElementById('novoUsuarioNome').value = '';
+    document.getElementById('novoUsuarioTipo').value = 'comum';
+    
+    await carregarUsuarios();
+    alert('Usuário cadastrado com sucesso!');
+  } catch (error) {
+    console.error('Erro ao cadastrar usuário:', error);
+    alert('Erro ao cadastrar usuário. Verifique o console.');
+  }
+}
+
+async function editarUsuario(id) {
+  try {
+    let usuarios = await getItem(USUARIOS_DB) || [];
+    const usuario = usuarios.find(u => u.id === id);
+    
+    if (usuario) {
+      const novoNome = prompt('Novo nome:', usuario.nome);
+      const novoTipo = prompt('Novo tipo (comum/admin):', usuario.tipo);
+      
+      if (novoNome && novoTipo) {
+        usuario.nome = novoNome;
+        usuario.tipo = novoTipo.toLowerCase() === 'admin' ? 'admin' : 'comum';
+        await setItem(USUARIOS_DB, usuarios);
+        await carregarUsuarios();
+        alert('Usuário atualizado com sucesso!');
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao editar usuário:', error);
+    alert('Erro ao editar usuário. Verifique o console.');
+  }
+}
+
+async function removerUsuario(id) {
+  try {
+    if (confirm('Tem certeza que deseja remover este usuário?')) {
+      let usuarios = await getItem(USUARIOS_DB) || [];
+      usuarios = usuarios.filter(u => u.id !== id);
+      await setItem(USUARIOS_DB, usuarios);
+      await carregarUsuarios();
+      alert('Usuário removido com sucesso!');
+    }
+  } catch (error) {
+    console.error('Erro ao remover usuário:', error);
+    alert('Erro ao remover usuário. Verifique o console.');
+  }
+}
+
+async function fazerBackup() {
+  try {
+    const backup = {
+      medicamentos: await getItem(MEDICAMENTOS_DB) || [],
+      usuarios: await getItem(USUARIOS_DB) || [],
+      movimentacoes: await getItem(MOVIMENTACOES_DB) || [],
+      configuracoes: await getItem(CONFIGURACOES_DB) || {}
+    };
+    
+    const data = new Date().toISOString().replace(/[:.]/g, '-');
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `backup-${data}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    alert('Backup realizado com sucesso!');
+  } catch (error) {
+    console.error('Erro ao fazer backup:', error);
+    alert('Erro ao fazer backup. Verifique o console.');
+  }
+}
+
+async function restaurarBackup() {
+  try {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const text = await file.text();
+        const backup = JSON.parse(text);
+        
+        if (confirm('Tem certeza que deseja restaurar o backup? Isso substituirá os dados atuais.')) {
+          await setItem(MEDICAMENTOS_DB, backup.medicamentos);
+          await setItem(USUARIOS_DB, backup.usuarios);
+          await setItem(MOVIMENTACOES_DB, backup.movimentacoes);
+          await setItem(CONFIGURACOES_DB, backup.configuracoes);
+          await atualizarDashboard();
+          await carregarUsuarios();
+          alert('Backup restaurado com sucesso!');
+        }
+      }
+    };
+    input.click();
+  } catch (error) {
+    console.error('Erro ao restaurar backup:', error);
+    alert('Erro ao restaurar backup. Verifique o console.');
+  }
+}
+
+async function limparDadosAntigos() {
+  try {
+    if (confirm('Tem certeza que deseja limpar dados antigos (movimentações de mais de 90 dias)?')) {
+      const movimentacoes = await getItem(MOVIMENTACOES_DB) || [];
+      const hoje = new Date();
+      const dataLimite = new Date(hoje);
+      dataLimite.setDate(hoje.getDate() - 90);
+      
+      const novasMovimentacoes = movimentacoes.filter(mov => new Date(mov.data) >= dataLimite);
+      await setItem(MOVIMENTACOES_DB, novasMovimentacoes);
+      await atualizarDashboard();
+      alert('Dados antigos limpos com sucesso!');
+    }
+  } catch (error) {
+    console.error('Erro ao limpar dados antigos:', error);
+    alert('Erro ao limpar dados antigos. Verifique o console.');
+  }
+}
+
+async function recalcularEstoque() {
+  try {
+    if (confirm('Tem certeza que deseja recalcular o estoque? Isso pode sobrescrever movimentações inconsistentes.')) {
+      const medicamentos = await getItem(MEDICAMENTOS_DB) || [];
+      const movimentacoes = await getItem(MOVIMENTACOES_DB) || [];
+      
+      medicamentos.forEach(med => {
+        med.quantidade = 0;
+      });
+      
+      movimentacoes.forEach(mov => {
+        const medicamento = medicamentos.find(m => m.id === mov.medicamentoId);
+        if (medicamento) {
+          if (mov.tipo === 'entrada' || mov.tipo === 'devolucao') {
+            medicamento.quantidade += mov.quantidade;
+          } else {
+            medicamento.quantidade -= mov.quantidade;
+          }
+        }
+      });
+      
+      await setItem(MEDICAMENTOS_DB, medicamentos);
+      await atualizarDashboard();
+      alert('Estoque recalculado com sucesso!');
+    }
+  } catch (error) {
+    console.error('Erro ao recalcular estoque:', error);
+    alert('Erro ao recalcular estoque. Verifique o console.');
+  }
+}
+
+window.onload = async function() {
+  await openIDB();
+  await inicializarBancosDeDados();
+  document.getElementById('userId').focus();
+  
+  document.getElementById('backBtn').addEventListener('click', navigateBack);
+  
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    sidebar.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-module]');
+      if (li) {
+        const moduleId = li.getAttribute('data-module');
+        if (moduleId === 'sair') {
+          logout();
+        } else {
+          navigateTo(moduleId);
+        }
+      }
+    });
+  }
+};
              

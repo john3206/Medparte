@@ -3,216 +3,498 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Medicamentos</title>
+    <title>Sistema de Controle de Medicamentos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.1/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/emailjs-com@3.2.0/dist/email.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 </head>
 <body>
-    <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
-        <div style="background: white; padding: 20px; border-radius: 5px;">
-            <i class="fas fa-spinner fa-spin"></i> Carregando...
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+    </div>
+    
+    <!-- Overlay para fechar o menu em dispositivos móveis -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMenu()"></div>
+    
+    <!-- Tela de Login -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-form">
+            <h2><i class="fas fa-pills"></i> Controle de Medicamentos</h2>
+            <div class="form-group">
+                <input type="number" id="userId" placeholder="Digite seu ID de usuário" min="1">
+            </div>
+            <button class="btn" onclick="login()">Entrar <i class="fas fa-sign-in-alt"></i></button>
         </div>
     </div>
-
-    <div id="loginContainer" style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0;">
-        <div style="text-align: center; padding: 20px; background: white; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1);">
-            <h2>Login</h2>
-            <input type="number" id="userId" placeholder="Digite seu ID" style="margin: 10px; padding: 5px; width: 200px;">
-            <button onclick="login()" style="padding: 5px 10px; background: #1a4f72; color: white; border: none; border-radius: 3px; cursor: pointer;">Entrar</button>
+    
+    <!-- Modal de Alerta -->
+    <div class="modal" id="alertModal">
+        <div class="modal-content">
+            <h3 id="alertTitle">Alerta</h3>
+            <p id="alertMessage"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-ok" onclick="confirmarEnvioEmail()">Sim</button>
+                <button class="modal-btn modal-btn-cancel" onclick="closeAlert()">Não</button>
+            </div>
         </div>
     </div>
-
-    <div id="appContainer" style="display: none; height: 100vh; display: flex;">
-        <div id="sidebar" class="sidebar">
+    
+    <!-- Modal de Confirmação de Saída -->
+    <div class="modal" id="exitModal">
+        <div class="modal-content">
+            <h3>Deseja realmente sair?</h3>
+            <p>Tem certeza que deseja sair do sistema?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-ok" onclick="confirmExit()">Sim</button>
+                <button class="modal-btn modal-btn-cancel" onclick="closeExitModal()">Não</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scanner de Código de Barras - VERSÃO CORRIGIDA -->
+    <div class="scanner-container" id="scannerContainer">
+        <div class="tipo-scanner">
+            <button class="tipo-scanner-btn active" id="btnQrCode" onclick="mudarTipoScanner('qrcode')">QR Code</button>
+            <button class="tipo-scanner-btn" id="btnBarcode" onclick="mudarTipoScanner('barcode')">Código de Barras</button>
+        </div>
+        <video class="scanner-video" id="scannerVideo" playsinline></video>
+        <div class="scanner-overlay"></div>
+        <div class="scanner-instructions" id="scannerInstructions">
+            <h3>Posicione o código dentro do quadro</h3>
+            <p>O scanner irá detectar automaticamente o código</p>
+        </div>
+        <div class="scanner-error" id="scannerError">
+            <h3>Não foi possível acessar a câmera</h3>
+            <p>Verifique se você concedeu permissão para uso da câmera ou se outro aplicativo não está utilizando o dispositivo.</p>
+            <button class="scanner-error-btn" onclick="fecharScanner()">Fechar</button>
+            <button class="scanner-error-btn" onclick="iniciarScanner(scannerCampoAlvo)" style="background: var(--secondary);">Tentar novamente</button>
+        </div>
+        <button class="scanner-close" onclick="fecharScanner()">&times;</button>
+    </div>
+    
+    <!-- Sistema Principal -->
+    <div class="app-container" id="appContainer">
+        <!-- Menu Lateral -->
+        <div class="sidebar" id="sidebar">
+            <div class="user-info">
+                <div class="avatar">
+                    <i class="fas fa-user-circle fa-3x"></i>
+                </div>
+                <h3 id="userName">Usuário</h3>
+                <p>ID: <span id="userIdDisplay">000</span> <span id="userTypeBadge"></span></p>
+            </div>
+            
             <ul class="menu">
-                <li data-module="dashboard" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
-                <li id="menuCadastrar" data-module="cadastrar" style="display: none;"><i class="fas fa-plus"></i> Cadastrar</li>
-                <li data-module="retirar"><i class="fas fa-minus"></i> Retirar</li>
+                <li class="active" data-module="dashboard"><i class="fas fa-home"></i> Menu Principal</li>
+                <li data-module="cadastrar" id="menuCadastrar"><i class="fas fa-plus-circle"></i> Cadastrar Medicamento</li>
+                <li data-module="retirar"><i class="fas fa-minus-circle"></i> Retirar/Devolver</li>
                 <li data-module="pesquisar"><i class="fas fa-search"></i> Pesquisar</li>
-                <li id="menuRelatorios" data-module="relatorios" style="display: none;"><i class="fas fa-chart-bar"></i> Relatórios</li>
-                <li id="menuUsuarios" data-module="usuarios" style="display: none;"><i class="fas fa-users"></i> Usuários</li>
-                <li id="menuConfiguracoes" data-module="configuracoes" style="display: none;"><i class="fas fa-cog"></i> Configurações</li>
+                <li data-module="relatorios" id="menuRelatorios"><i class="fas fa-chart-bar"></i> Relatórios</li>
+                <li data-module="usuarios" id="menuUsuarios"><i class="fas fa-users"></i> Usuários</li>
+                <li data-module="configuracoes" id="menuConfiguracoes"><i class="fas fa-cog"></i> Configurações</li>
                 <li data-module="sair" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</li>
             </ul>
         </div>
-        <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleMenu()"></div>
-
+        
+        <!-- Conteúdo Principal -->
         <div class="main-content">
             <div class="header">
-                <button id="backBtn" style="margin-right: 10px; padding: 5px 10px; background: #ff4444; color: white; border: none; border-radius: 3px; cursor: pointer;">Voltar</button>
-                <h2 id="moduleTitle">Dashboard</h2>
-                <div class="user-info">
-                    <div class="avatar"></div>
-                    <span id="userName"></span> (ID: <span id="userIdDisplay"></span>)
-                    <span id="userTypeBadge"></span>
+                <button class="menu-toggle" onclick="toggleMenu()">
+                    <i class="fas fa-bars"></i> Menu
+                </button>
+                <h1 id="moduleTitle" style="text-align: center; width: 100%;">Menu Principal</h1>
+                <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
+            </div>
+            
+            <!-- Dashboard -->
+            <div class="module active" id="dashboard">
+                <h2>Resumo do Estoque</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <div class="stat-card" style="background: #e8f4fc; padding: 20px; border-radius: 8px; text-align: center;">
+                            <h3 id="totalMedicamentos">0</h3>
+                            <p>Medicamentos Cadastrados</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="stat-card" style="background: #e6f7ee; padding: 20px; border-radius: 8px; text-align: center;">
+                            <h3 id="totalValor">R$ 0,00</h3>
+                            <p>Valor Total em Estoque</p>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="stat-card" style="background: #fef5e7; padding: 20px; border-radius: 8px; text-align: center;">
+                            <h3 id="proximosVencimentos">0</h3>
+                            <p>Próximos Vencimentos</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <div class="stat-card" style="background: #fde8e8; padding: 20px; border-radius: 8px; text-align: center;">
+                            <h3 id="totalGastoMes">R$ 0,00</h3>
+                            <p>Total Gasto no Mês</p>
+                        </div>
+                    </div>
+                    <div class="formGroup">
+                        <div class="stat-card" style="background: #e0f7fa; padding: 20px; border-radius: 8px; text-align: center;">
+                            <h3 id="medicamentoMaisUtilizado">-</h3>
+                            <p>Medicamento Mais Utilizado</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <h2>Últimas Movimentações</h2>
+                <div class="table-container">
+                    <table id="movimentacoesTable">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Medicamento</th>
+                                <th>Lote</th>
+                                <th>Quantidade</th>
+                                <th>Valor Total</th>
+                                <th>Usuário</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            <div id="mainContent">
-                <div id="dashboard" class="module active">
-                    <h2>Métricas</h2>
-                    <p>Total de Medicamentos: <span id="totalMedicamentos"></span></p>
-                    <p>Valor Total em Estoque: <span id="totalValor"></span></p>
-                    <p>Próximos a Vencer: <span id="proximosVencimentos"></span></p>
-                    <p>Gasto no Mês: <span id="totalGastoMes"></span></p>
-                    <p>Medicamento Mais Utilizado: <span id="medicamentoMaisUtilizado"></span></p>
-                    <h2>Últimas Movimentações</h2>
-                    <table id="movimentacoesTable">
-                        <thead><tr><th>Data</th><th>Medicamento</th><th>Lote</th><th>Quantidade</th><th>Valor Total</th><th>Usuário</th><th>Tipo</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                    <h2>5 Medicamentos Mais Usados</h2>
-                    <table id="top5Medicamentos">
-                        <thead><tr><th>Medicamento</th><th>Quantidade Usada</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
-                    <p id="storageInfo"></p>
-                </div>
-
-                <div id="cadastrar" class="module">
-                    <h2>Cadastrar Medicamento</h2>
-                    <input type="text" id="codigoBarras" placeholder="Código de Barras" style="margin: 5px; padding: 5px; width: 200px;">
-                    <button onclick="iniciarScanner('codigoBarras')" style="margin: 5px; padding: 5px 10px;">Escanear</button>
-                    <input type="text" id="nomeMedicamento" placeholder="Nome" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="text" id="fabricante" placeholder="Fabricante" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="text" id="lote" placeholder="Lote" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="number" id="quantidade" placeholder="Quantidade" style="margin: 5px; padding: 5px; width: 200px;" oninput="calcularValorUnitario()">
-                    <input type="number" id="valorTotal" placeholder="Valor Total" step="0.01" style="margin: 5px; padding: 5px; width: 200px;" oninput="calcularValorUnitario()">
-                    <p id="valorUnitarioInfo" style="margin: 5px;">Valor unitário: R$ 0,00</p>
-                    <input type="date" id="validade" style="margin: 5px; padding: 5px; width: 200px;">
-                    <textarea id="observacoes" placeholder="Observações" style="margin: 5px; padding: 5px; width: 200px; height: 50px;"></textarea>
-                    <button onclick="cadastrarMedicamento()" style="margin: 5px; padding: 5px 10px; background: #1a4f72; color: white; border: none; border-radius: 3px; cursor: pointer;">Cadastrar</button>
-                </div>
-
-                <div id="retirar" class="module">
-                    <h2>Retirar Medicamento</h2>
-                    <input type="text" id="retirarCodigo" placeholder="Código de Barras" style="margin: 5px; padding: 5px; width: 200px;">
-                    <button onclick="iniciarScanner('retirarCodigo')" style="margin: 5px; padding: 5px 10px;">Escanear</button>
-                    <input type="text" id="medicamentoRetirada" placeholder="Medicamento" readonly style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="text" id="loteRetirada" placeholder="Lote" readonly style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="number" id="valorUnitarioRetirada" placeholder="Valor Unitário" readonly style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="number" id="quantidadeRetirada" placeholder="Quantidade" style="margin: 5px; padding: 5px; width: 200px;" oninput="calcularValorTotalRetirada()">
-                    <p id="valorTotalRetiradaInfo" style="margin: 5px;">Valor total: R$ 0,00</p>
-                    <select id="tipoMovimentacao" onchange="toggleMotivoField()" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="saida">Saída</option>
-                        <option value="devolucao">Devolução</option>
-                    </select>
-                    <div id="motivoField" style="margin: 5px;">
-                        <input type="text" id="motivoRetirada" placeholder="Motivo" style="padding: 5px; width: 200px;">
+            
+            <!-- Cadastrar Medicamento -->
+            <div class="module" id="cadastrar">
+                <h2>Cadastrar Novo Medicamento</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigoBarras">Código de Barras</label>
+                        <input type="text" id="codigoBarras" placeholder="Digite ou escaneie o código">
+                        <button class="scan-btn" onclick="iniciarScanner('codigoBarras')"><i class="fas fa-barcode"></i> Escanear Código</button>
+                        <button class="scan-btn" onclick="simularScan('codigoBarras')" style="background: var(--accent);"><i class="fas fa-qrcode"></i> Simular Scan</button>
+                        <div class="camera-permission-help" id="cameraHelp">
+                            <h4>Problemas com a câmera?</h4>
+                            <ol>
+                                <li>Verifique se o navegador tem permissão para acessar a câmera</li>
+                                <li>Certifique-se de que nenhum outro aplicativo está usando a câmera</li>
+                                <li>Se estiver em um dispositivo móvel, tente usar a câmera traseira</li>
+                                <li>Recarregue a página e tente novamente</li>
+                            </ol>
+                        </div>
                     </div>
-                    <button onclick="processarMovimentacao()" style="margin: 5px; padding: 5px 10px; background: #1a4f72; color: white; border: none; border-radius: 3px; cursor: pointer;">Confirmar</button>
+                    <div class="form-group">
+                        <label for="nomeMedicamento">Nome do Medicamento</label>
+                        <input type="text" id="nomeMedicamento" placeholder="Nome do medicamento">
+                    </div>
                 </div>
-
-                <div id="pesquisar" class="module">
-                    <h2>Pesquisar Medicamentos</h2>
-                    <input type="text" id="pesquisaTermo" placeholder="Pesquisar..." style="margin: 5px; padding: 5px; width: 200px;">
-                    <select id="filtroStatus" onchange="filtrarMedicamentos()" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="todos">Todos</option>
-                        <option value="disponivel">Disponível</option>
-                        <option value="vencendo">Vencendo</option>
-                        <option value="vencido">Vencido</option>
-                        <option value="estoque-baixo">Estoque Baixo</option>
-                    </select>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="fabricante">Fabricante</label>
+                        <input type="text" id="fabricante" placeholder="Fabricante">
+                    </div>
+                    <div class="form-group">
+                        <label for="lote">Lote</label>
+                        <input type="text" id="lote" placeholder="Número do lote">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="quantidade">Quantidade</label>
+                        <input type="number" id="quantidade" min="1" placeholder="Quantidade" oninput="calcularValorUnitario()">
+                    </div>
+                    <div class="form-group">
+                        <label for="valorTotal">Valor Total (R$)</label>
+                        <input type="number" id="valorTotal" min="0.01" step="0.01" placeholder="Valor total pago" oninput="calcularValorUnitario()">
+                        <div class="valor-info" id="valorUnitarioInfo">Valor unitário: R$ 0,00</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="validade">Data de Validade</label>
+                        <input type="date" id="validade">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="observacoes">Observações</label>
+                    <textarea id="observacoes" rows="3" placeholder="Observações adicionais"></textarea>
+                </div>
+                
+                <button class="btn" onclick="cadastrarMedicamento()">Cadastrar Medicamento</button>
+            </div>
+            
+            <!-- Retirar/Devolver Medicamento -->
+            <div class="module" id="retirar">
+                <h2>Retirar/Devolver Medicamento</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="retirarCodigo">Código de Barras</label>
+                        <input type="text" id="retirarCodigo" placeholder="Digite ou escaneie o código">
+                        <button class="scan-btn" onclick="iniciarScanner('retirarCodigo')"><i class="fas fa-barcode"></i> Escanear Código</button>
+                        <button class="scan-btn" onclick="simularScan('retirarCodigo')" style="background: var(--accent);"><i class="fas fa-qrcode"></i> Simular Scan</button>
+                        <button class="search-btn" onclick="buscarMedicamentoPorCodigo(document.getElementById('retirarCodigo').value)"><i class="fas fa-search"></i> Buscar</button>
+                        <div class="camera-permission-help" id="cameraHelpRetirar">
+                            <h4>Problemas com a câmera?</h4>
+                            <ol>
+                                <li>Verifique se o navegador tem permissão para acessar a câmera</li>
+                                <li>Certifique-se de que nenhum outro aplicativo está usando a câmera</li>
+                                <li>Se estiver em um dispositivo móvel, tente usar a câmera traseira</li>
+                                <li>Recarregue a página e tente novamente</li>
+                            </ol>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicamentoRetirada">Medicamento</label>
+                        <input type="text" id="medicamentoRetirada" readonly>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="loteRetirada">Lote</label>
+                        <input type="text" id="loteRetirada" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantidadeRetirada">Quantidade</label>
+                        <input type="number" id="quantidadeRetirada" min="1" placeholder="Quantidade" oninput="calcularValorTotalRetirada()">
+                    </div>
+                    <div class="form-group">
+                        <label for="valorUnitarioRetirada">Valor Unitário (R$)</label>
+                        <input type="text" id="valorUnitarioRetirada" readonly>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tipoMovimentacao">Tipo de Movimentação</label>
+                        <select id="tipoMovimentacao" onchange="toggleMotivoField()">
+                            <option value="saida">Retirada</option>
+                            <option value="devolucao">Devolução</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="motivoField">
+                        <label for="motivoRetirada">Motivo da Retirada</label>
+                        <select id="motivoRetirada">
+                            <option value="uso">Uso Interno</option>
+                            <option value="venda">Venda</option>
+                            <option value="descarte">Descarte</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <div class="valor-info" id="valorTotalRetiradaInfo">Valor total: R$ 0,00</div>
+                </div>
+                
+                <button class="btn" onclick="processarMovimentacao()">Confirmar</button>
+            </div>
+            
+            <!-- Pesquisar Medicamento -->
+            <div class="module" id="pesquisar">
+                <h2>Pesquisar Medicamentos</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="pesquisaTermo">Termo de Pesquisa</label>
+                        <input type="text" id="pesquisaTermo" placeholder="Nome, código ou fabricante">
+                    </div>
+                    <div class="form-group">
+                        <label for="filtroStatus">Status</label>
+                        <select id="filtroStatus">
+                            <option value="todos">Todos</option>
+                            <option value="disponivel">Disponível</option>
+                            <option value="vencendo">Próximo do Vencimento</option>
+                            <option value="vencido">Vencido</option>
+                            <option value="estoque-baixo">Estoque Baixo</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="filtrarMedicamentos()">Pesquisar</button>
+                
+                <div class="table-container">
                     <table id="tabelaPesquisa">
-                        <thead><tr><th>Código</th><th>Nome</th><th>Fabricante</th><th>Lote</th><th>Quantidade</th><th>Valor Unitário</th><th>Validade</th><th>Status</th><th>Ações</th></tr></thead>
-                        <tbody></tbody>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nome</th>
+                                <th>Fabricante</th>
+                                <th>Lote</th>
+                                <th>Quantidade</th>
+                                <th>Valor Unit.</th>
+                                <th>Validade</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
                     </table>
                 </div>
-
-                <div id="relatorios" class="module">
-                    <h2>Relatórios</h2>
-                    <select id="tipoRelatorio" onchange="mudarTipoRelatorio()" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="movimentacoes">Movimentações</option>
-                        <option value="estoque">Estoque</option>
-                        <option value="vencimentos">Vencimentos</option>
-                        <option value="valor">Valor em Estoque</option>
-                    </select>
-                    <select id="periodoRelatorio" onchange="mudarTipoRelatorio()" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="7">Últimos 7 dias</option>
-                        <option value="30">Últimos 30 dias</option>
-                        <option value="90">Últimos 90 dias</option>
-                        <option value="personalizado">Personalizado</option>
-                    </select>
-                    <div id="periodoPersonalizado" style="display: none; margin: 5px;">
-                        <input type="date" id="dataInicio" style="padding: 5px; width: 200px;">
-                        <input type="date" id="dataFim" style="padding: 5px; width: 200px;">
+            </div>
+            
+            <!-- Relatórios -->
+            <div class="module" id="relatorios">
+                <h2>Relatórios</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tipoRelatorio">Tipo de Relatório</label>
+                        <select id="tipoRelatorio" onchange="mudarTipoRelatorio()">
+                            <option value="movimentacoes">Movimentações</option>
+                            <option value="estoque">Situação do Estoque</option>
+                            <option value="vencimentos">Próximos Vencimentos</option>
+                            <option value="valor">Valor em Estoque</option>
+                        </select>
                     </div>
-                    <button onclick="gerarRelatorio()" style="margin: 5px; padding: 5px 10px;">Gerar</button>
-                    <button onclick="exportarRelatorio()" style="margin: 5px; padding: 5px 10px;">Exportar CSV</button>
-                    <table id="tabelaRelatorio"></table>
-                    <div id="conteudoResumo"></div>
-                    <canvas id="relatorioChart" style="max-width: 600px; max-height: 400px; margin: 5px;"></canvas>
+                    <div class="form-group">
+                        <label for="periodoRelatorio">Período</label>
+                        <select id="periodoRelatorio">
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="30" selected>Últimos 30 dias</option>
+                            <option value="90">Últimos 3 meses</option>
+                            <option value="180">Últimos 6 meses</option>
+                            <option value="365">Último ano</option>
+                            <option value="personalizado">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="periodoPersonalizado" style="display: none;">
+                        <label for="dataInicio">Data Início</label>
+                        <input type="date" id="dataInicio">
+                        <label for="dataFim">Data Fim</label>
+                        <input type="date" id="dataFim">
+                    </div>
                 </div>
-
-                <div id="usuarios" class="module">
-                    <h2>Gerenciar Usuários</h2>
-                    <input type="number" id="novoUsuarioId" placeholder="ID" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="text" id="novoUsuarioNome" placeholder="Nome" style="margin: 5px; padding: 5px; width: 200px;">
-                    <select id="novoUsuarioTipo" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="comum">Comum</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                    <button onclick="cadastrarUsuario()" style="margin: 5px; padding: 5px 10px;">Cadastrar</button>
-                    <table id="tabelaUsuarios">
-                        <thead><tr><th>ID</th><th>Nome</th><th>Tipo</th><th>Data de Criação</th><th>Ações</th></tr></thead>
-                        <tbody></tbody>
+                
+                <button class="btn" onclick="gerarRelatorio()">Gerar Relatório</button>
+                <button class="export-btn" onclick="exportarRelatorio()"><i class="fas fa-download"></i> Exportar</button>
+                
+                <div class="resumo-mensal" id="resumoRelatorio">
+                    <h3>Resumo do Relatório</h3>
+                    <div id="conteudoResumo">
+                        <!-- Preenchido via JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table id="tabelaRelatorio">
+                        <thead>
+                            <!-- Preenchido via JavaScript -->
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
                     </table>
                 </div>
-
-                <div id="configuracoes" class="module">
-                    <h2>Configurações</h2>
-                    <input type="email" id="emailNotificacao" placeholder="Email de Notificação" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="number" id="diasAlertaVencimento" placeholder="Dias de Alerta de Vencimento" style="margin: 5px; padding: 5px; width: 200px;">
-                    <input type="number" id="limiteEstoqueBaixo" placeholder="Limite de Estoque Baixo" style="margin: 5px; padding: 5px; width: 200px;">
-                    <select id="backupAuto" style="margin: 5px; padding: 5px; width: 200px;">
-                        <option value="semanal">Semanal</option>
+                
+                <div class="chart-container">
+                    <canvas id="relatorioChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Gerenciar Usuários -->
+            <div class="module" id="usuarios">
+                <h2>Gerenciar Usuários</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="novoUsuarioId">ID do Usuário</label>
+                        <input type="number" id="novoUsuarioId" placeholder="Número de identificação">
+                    </div>
+                    <div class="form-group">
+                        <label for="novoUsuarioNome">Nome Completo</label>
+                        <input type="text" id="novoUsuarioNome" placeholder="Nome do usuário">
+                    </div>
+                    <div class="form-group">
+                        <label for="novoUsuarioTipo">Tipo de Usuário</label>
+                        <select id="novoUsuarioTipo">
+                            <option value="comum">Usuário Comum</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="cadastrarUsuario()">Cadastrar Usuário</button>
+                
+                <div class="table-container">
+                    <table id="tabelaUsuarios">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Tipo</th>
+                                <th>Data de Cadastro</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Preenchido via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Configurações -->
+            <div class="module" id="configuracoes">
+                <h2>Configurações do Sistema</h2>
+                <div class="form-group">
+                    <label for="emailNotificacao">E-mail para Notificações</label>
+                    <input type="email" id="emailNotificacao" placeholder="E-mail para receber alertas">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="diasAlertaVencimento">Dias para Alerta de Vencimento</label>
+                        <input type="number" id="diasAlertaVencimento" min="1" max="365" placeholder="Ex: 30">
+                    </div>
+                    <div class="form-group">
+                        <label for="limiteEstoqueBaixo">Limite para Estoque Baixo</label>
+                        <input type="number" id="limiteEstoqueBaixo" min="1" placeholder="Quantidade mínima">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="backupAuto">Backup Automático</label>
+                    <select id="backupAuto">
+                        <option value="diario">Diário</option>
+                        <option value="semanal" selected>Semanal</option>
                         <option value="mensal">Mensal</option>
                         <option value="desativado">Desativado</option>
                     </select>
-                    <select id="temaInterface" style="margin: 5px; padding: 5px; width: 200px;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="temaInterface">Tema da Interface</label>
+                    <select id="temaInterface">
                         <option value="claro">Claro</option>
                         <option value="escuro">Escuro</option>
+                        <option value="auto">Automático</option>
                     </select>
-                    <button onclick="salvarConfiguracoes()" style="margin: 5px; padding: 5px 10px;">Salvar</button>
-                    <button onclick="fazerBackup()" style="margin: 5px; padding: 5px 10px;">Fazer Backup</button>
-                    <button onclick="restaurarBackup()" style="margin: 5px; padding: 5px 10px;">Restaurar Backup</button>
-                    <button onclick="limparDadosAntigos()" style="margin: 5px; padding: 5px 10px;">Limpar Dados Antigos</button>
-                    <button onclick="recalcularEstoque()" style="margin: 5px; padding: 5px 10px;">Recalcular Estoque</button>
+                </div>
+                
+                <button class="btn" onclick="salvarConfiguracoes()">Salvar Configurações</button>
+                
+                <div class="form-row" style="margin-top: 30px;">
+                    <div class="form-group">
+                        <h3>Backup de Dados</h3>
+                        <button class="btn" onclick="fazerBackup()" style="background: var(--success);">Fazer Backup Agora</button>
+                        <button class="btn" onclick="restaurarBackup()" style="background: var(--warning); margin-top: 10px;">Restaurar Backup</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <h3>Manutenção</h3>
+                        <button class="btn" onclick="limparDadosAntigos()" style="background: var(--secondary);">Limpar Dados Antigos</button>
+                        <button class="btn" onclick="recalcularEstoque()" style="background: var(--primary); margin-top: 10px;">Recalcular Valores</button>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <div id="scannerContainer" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
-            <div style="background: white; padding: 20px; border-radius: 5px; text-align: center;">
-                <video id="scannerVideo" style="width: 300px; height: 300px;" autoplay></video>
-                <p id="scannerInstructions">Aponte a câmera para o código de barras ou QR code.</p>
-                <div id="scannerError" style="display: none; color: red;">Erro ao acessar a câmera. Verifique as permissões.</div>
-                <p id="cameraHelp" style="display: none;">Ajuda: Certifique-se de que a câmera está conectada e liberada.</p>
-                <p id="cameraHelpRetirar" style="display: none;">Ajuda: Certifique-se de que a câmera está conectada e liberada.</p>
-                <button onclick="fecharScanner()" style="margin-top: 10px; padding: 5px 10px;">Fechar</button>
-            </div>
-        </div>
-
-        <div id="exitModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
-            <div style="background: white; padding: 20px; border-radius: 5px; text-align: center;">
-                <h3>Confirmar Saída</h3>
-                <p>Tem certeza que deseja sair?</p>
-                <button onclick="confirmExit()" style="margin: 5px; padding: 5px 10px; background: #1a4f72; color: white; border: none; border-radius: 3px;">Sim</button>
-                <button onclick="closeExitModal()" style="margin: 5px; padding: 5px 10px; background: #ff4444; color: white; border: none; border-radius: 3px;">Não</button>
-            </div>
-        </div>
-
-        <div id="alertModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
-            <div style="background: white; padding: 20px; border-radius: 5px; text-align: center;">
-                <h3>Alerta</h3>
-                <p id="alertMessage"></p>
-                <button onclick="closeAlert()" style="margin-top: 10px; padding: 5px 10px;">Fechar</button>
-            </div>
-        </div>
     </div>
+
+    <script src="script.js"></script>
 </body>
 </html>

@@ -478,10 +478,13 @@ function navigateTo(moduleId) {
     document.getElementById(moduleId).classList.add('active');
     
     // Ativar item do menu correspondente
-    document.querySelector(`.menu li[data-module="${moduleId}"]`).classList.add('active');
+    const menuItem = document.querySelector(`.menu li[data-module="${moduleId}"]`);
+    if (menuItem) {
+        menuItem.classList.add('active');
+    }
     
     // Atualizar título do módulo
-    document.getElementById('moduleTitle').textContent = document.querySelector(`.menu li[data-module="${moduleId}"]`).textContent;
+    document.getElementById('moduleTitle').textContent = menuItem ? menuItem.textContent : 'Módulo';
     
     // Adicionar ao histórico de navegação
     navigationHistory.push(moduleId);
@@ -660,7 +663,7 @@ function cadastrarMedicamento() {
     const existe = medicamentos.some(med => med.codigo === codigo && med.lote === lote);
     
     if (existe) {
-        alert('Já existe um medicamento com este código e lote. Use a funcionalidade de entrada de estoque.');
+        alert('Já existe um medicamento com este código and lote. Use a funcionalidade de entrada de estoque.');
         return;
     }
     
@@ -1137,7 +1140,7 @@ function gerarRelatorio() {
                 <td>${med.codigo}</td>
                 <td>${med.nome}</td>
                 <td>${med.fabricante}</td>
-                <td>${med.lote</td>
+                <td>${med.lote}</td>
                 <td>${med.quantidade}</td>
                 <td>R$ ${med.valorUnitario.toFixed(2)}</td>
                 <td>${formatarData(med.dataValidade)}</td>
@@ -1234,7 +1237,7 @@ function cadastrarUsuario() {
     
     const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
     
-    // Verificar si ID já existe
+    // Verificar se ID já existe
     if (usuarios.some(u => u.id === id)) {
         alert('Já existe um usuário com este ID.');
         return;

@@ -5,19 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Controle de Medicamentos</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
-</head>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    </head>
 <body>
-    <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
-        <div class="spinner"></div>
-    </div>
-    
-    <!-- Overlay para fechar o menu em dispositivos móveis -->
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMenu()"></div>
-    
     <!-- Tela de Login -->
     <div class="login-container" id="loginContainer">
         <div class="login-form">
@@ -41,36 +32,10 @@
         </div>
     </div>
     
-    <!-- Modal de Confirmação de Saída -->
-    <div class="modal" id="exitModal">
-        <div class="modal-content">
-            <h3>Deseja realmente sair?</h3>
-            <p>Tem certeza que deseja sair do sistema?</p>
-            <div class="modal-buttons">
-                <button class="modal-btn modal-btn-ok" onclick="confirmExit()">Sim</button>
-                <button class="modal-btn modal-btn-cancel" onclick="closeExitModal()">Não</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Scanner de Código de Barras - VERSÃO CORRIGIDA -->
+    <!-- Scanner de Código de Barras -->
     <div class="scanner-container" id="scannerContainer">
-        <div class="tipo-scanner">
-            <button class="tipo-scanner-btn active" id="btnQrCode" onclick="mudarTipoScanner('qrcode')">QR Code</button>
-            <button class="tipo-scanner-btn" id="btnBarcode" onclick="mudarTipoScanner('barcode')">Código de Barras</button>
-        </div>
-        <video class="scanner-video" id="scannerVideo" playsinline></video>
+        <video class="scanner-video" id="scannerVideo"></video>
         <div class="scanner-overlay"></div>
-        <div class="scanner-instructions" id="scannerInstructions">
-            <h3>Posicione o código dentro do quadro</h3>
-            <p>O scanner irá detectar automaticamente o código</p>
-        </div>
-        <div class="scanner-error" id="scannerError">
-            <h3>Não foi possível acessar a câmera</h3>
-            <p>Verifique se você concedeu permissão para uso da câmera ou se outro aplicativo não está utilizando o dispositivo.</p>
-            <button class="scanner-error-btn" onclick="fecharScanner()">Fechar</button>
-            <button class="scanner-error-btn" onclick="iniciarScanner(scannerCampoAlvo)" style="background: var(--secondary);">Tentar novamente</button>
-        </div>
         <button class="scanner-close" onclick="fecharScanner()">&times;</button>
     </div>
     
@@ -87,7 +52,7 @@
             </div>
             
             <ul class="menu">
-                <li class="active" data-module="dashboard"><i class="fas fa-home"></i> Menu Principal</li>
+                <li class="active" data-module="dashboard"><i class="fas fa-home"></i> Dashboard</li>
                 <li data-module="cadastrar" id="menuCadastrar"><i class="fas fa-plus-circle"></i> Cadastrar Medicamento</li>
                 <li data-module="retirar"><i class="fas fa-minus-circle"></i> Retirar/Devolver</li>
                 <li data-module="pesquisar"><i class="fas fa-search"></i> Pesquisar</li>
@@ -104,7 +69,7 @@
                 <button class="menu-toggle" onclick="toggleMenu()">
                     <i class="fas fa-bars"></i> Menu
                 </button>
-                <h1 id="moduleTitle" style="text-align: center; width: 100%;">Menu Principal</h1>
+                <h1 id="moduleTitle">Dashboard</h1>
                 <button class="logout-btn" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Sair</button>
             </div>
             
@@ -139,7 +104,7 @@
                             <p>Total Gasto no Mês</p>
                         </div>
                     </div>
-                    <div class="formGroup">
+                    <div class="form-group">
                         <div class="stat-card" style="background: #e0f7fa; padding: 20px; border-radius: 8px; text-align: center;">
                             <h3 id="medicamentoMaisUtilizado">-</h3>
                             <p>Medicamento Mais Utilizado</p>
@@ -177,15 +142,6 @@
                         <input type="text" id="codigoBarras" placeholder="Digite ou escaneie o código">
                         <button class="scan-btn" onclick="iniciarScanner('codigoBarras')"><i class="fas fa-barcode"></i> Escanear Código</button>
                         <button class="scan-btn" onclick="simularScan('codigoBarras')" style="background: var(--accent);"><i class="fas fa-qrcode"></i> Simular Scan</button>
-                        <div class="camera-permission-help" id="cameraHelp">
-                            <h4>Problemas com a câmera?</h4>
-                            <ol>
-                                <li>Verifique se o navegador tem permissão para acessar a câmera</li>
-                                <li>Certifique-se de que nenhum outro aplicativo está usando a câmera</li>
-                                <li>Se estiver em um dispositivo móvel, tente usar a câmera traseira</li>
-                                <li>Recarregue a página e tente novamente</li>
-                            </ol>
-                        </div>
                     </div>
                     <div class="form-group">
                         <label for="nomeMedicamento">Nome do Medicamento</label>
@@ -234,19 +190,9 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="retirarCodigo">Código de Barras</label>
-                        <input type="text" id="retirarCodigo" placeholder="Digite ou escaneie o código">
+                        <input type="text" id="retirarCodigo" placeholder="Digite ou escaneie o código" oninput="buscarMedicamentoPorCodigo(this.value)">
                         <button class="scan-btn" onclick="iniciarScanner('retirarCodigo')"><i class="fas fa-barcode"></i> Escanear Código</button>
                         <button class="scan-btn" onclick="simularScan('retirarCodigo')" style="background: var(--accent);"><i class="fas fa-qrcode"></i> Simular Scan</button>
-                        <button class="search-btn" onclick="buscarMedicamentoPorCodigo(document.getElementById('retirarCodigo').value)"><i class="fas fa-search"></i> Buscar</button>
-                        <div class="camera-permission-help" id="cameraHelpRetirar">
-                            <h4>Problemas com a câmera?</h4>
-                            <ol>
-                                <li>Verifique se o navegador tem permissão para acessar a câmera</li>
-                                <li>Certifique-se de que nenhum outro aplicativo está usando a câmera</li>
-                                <li>Se estiver em um dispositivo móvel, tente usar a câmera traseira</li>
-                                <li>Recarregue a página e tente novamente</li>
-                            </ol>
-                        </div>
                     </div>
                     <div class="form-group">
                         <label for="medicamentoRetirada">Medicamento</label>
@@ -298,38 +244,22 @@
             <!-- Pesquisar Medicamento -->
             <div class="module" id="pesquisar">
                 <h2>Pesquisar Medicamentos</h2>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="pesquisaTermo">Termo de Pesquisa</label>
-                        <input type="text" id="pesquisaTermo" placeholder="Nome, código ou fabricante">
-                    </div>
-                    <div class="form-group">
-                        <label for="filtroStatus">Status</label>
-                        <select id="filtroStatus">
-                            <option value="todos">Todos</option>
-                            <option value="disponivel">Disponível</option>
-                            <option value="vencendo">Próximo do Vencimento</option>
-                            <option value="vencido">Vencido</option>
-                            <option value="estoque-baixo">Estoque Baixo</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="termoPesquisa">Digite para pesquisar</label>
+                    <input type="text" id="termoPesquisa" placeholder="Nome, código ou lote" oninput="pesquisarMedicamentos(this.value)">
                 </div>
                 
-                <button class="btn" onclick="filtrarMedicamentos()">Pesquisar</button>
-                
                 <div class="table-container">
-                    <table id="tabelaPesquisa">
+                    <table id="resultadosPesquisa">
                         <thead>
                             <tr>
                                 <th>Código</th>
                                 <th>Nome</th>
-                                <th>Fabricante</th>
                                 <th>Lote</th>
                                 <th>Quantidade</th>
-                                <th>Valor Unit.</th>
                                 <th>Validade</th>
-                                <th>Status</th>
-                                <th>Ações</th>
+                                <th>Valor Unit.</th>
+                                <th id="thAcoes">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -341,59 +271,64 @@
             
             <!-- Relatórios -->
             <div class="module" id="relatorios">
-                <h2>Relatórios</h2>
+                <h2>Relatórios 
+                    <button class="export-btn" onclick="exportarParaExcel()">
+                        <i class="fas fa-file-excel"></i> Exportar para Excel
+                    </button>
+                </h2>
+                
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="tipoRelatorio">Tipo de Relatório</label>
-                        <select id="tipoRelatorio" onchange="mudarTipoRelatorio()">
-                            <option value="movimentacoes">Movimentações</option>
-                            <option value="estoque">Situação do Estoque</option>
+                        <label for="relatorioTipo">Tipo de Relatório</label>
+                        <select id="relatorioTipo" onchange="mudarTipoRelatorio()">
                             <option value="vencimentos">Próximos Vencimentos</option>
+                            <option value="estoque">Estoque Baixo</option>
+                            <option value="movimentacoes">Movimentações</option>
                             <option value="valor">Valor em Estoque</option>
+                            <option value="frequencia">Frequência de Uso</option>
+                            <option value="gastos">Gastos Mensais</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="periodoRelatorio">Período</label>
-                        <select id="periodoRelatorio">
+                    <div class="form-group" id="periodoField">
+                        <label for="relatorioPeriodo">Período</label>
+                        <select id="relatorioPeriodo">
                             <option value="7">Últimos 7 dias</option>
-                            <option value="30" selected>Últimos 30 dias</option>
-                            <option value="90">Últimos 3 meses</option>
-                            <option value="180">Últimos 6 meses</option>
-                            <option value="365">Último ano</option>
-                            <option value="personalizado">Personalizado</option>
+                            <option value="30">Últimos 30 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                            <option value="365">Últimos 365 dias</option>
                         </select>
                     </div>
-                    <div class="form-group" id="periodoPersonalizado" style="display: none;">
-                        <label for="dataInicio">Data Início</label>
-                        <input type="date" id="dataInicio">
-                        <label for="dataFim">Data Fim</label>
-                        <input type="date" id="dataFim">
+                    <div class="form-group" id="mesField" style="display: none;">
+                        <label for="relatorioMes">Mês</label>
+                        <select id="relatorioMes">
+                            <option value="1">Janeiro</option>
+                            <option value="2">Fevereiro</option>
+                            <option value="3">Março</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Maio</option>
+                            <option value="6">Junho</option>
+                            <option value="7">Julho</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="anoField" style="display: none;">
+                        <label for="relatorioAno">Ano</label>
+                        <select id="relatorioAno">
+                            <option value="2023">2023</option>
+                            <option value="2024">2024</option>
+                            <option value="2025">2025</option>
+                        </select>
                     </div>
                 </div>
                 
                 <button class="btn" onclick="gerarRelatorio()">Gerar Relatório</button>
-                <button class="export-btn" onclick="exportarRelatorio()"><i class="fas fa-download"></i> Exportar</button>
                 
-                <div class="resumo-mensal" id="resumoRelatorio">
-                    <h3>Resumo do Relatório</h3>
-                    <div id="conteudoResumo">
-                        <!-- Preenchido via JavaScript -->
-                    </div>
-                </div>
-                
-                <div class="table-container">
-                    <table id="tabelaRelatorio">
-                        <thead>
-                            <!-- Preenchido via JavaScript -->
-                        </thead>
-                        <tbody>
-                            <!-- Preenchido via JavaScript -->
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="chart-container">
-                    <canvas id="relatorioChart"></canvas>
+                <div class="table-container" id="relatorioResultado" style="margin-top: 20px;">
+                    <!-- Resultados do relatório serão exibidos aqui -->
                 </div>
             </div>
             
@@ -402,13 +337,16 @@
                 <h2>Gerenciar Usuários</h2>
                 <div class="form-row">
                     <div class="form-group">
+                        <label for="novoUsuario">Nome do Novo Usuário</label>
+                        <input type="text" id="novoUsuario" placeholder="Nome completo">
+                    </div>
+                    <div class="form-group">
                         <label for="novoUsuarioId">ID do Usuário</label>
                         <input type="number" id="novoUsuarioId" placeholder="Número de identificação">
                     </div>
-                    <div class="form-group">
-                        <label for="novoUsuarioNome">Nome Completo</label>
-                        <input type="text" id="novoUsuarioNome" placeholder="Nome do usuário">
-                    </div>
+                </div>
+                
+                <div class="form-row">
                     <div class="form-group">
                         <label for="novoUsuarioTipo">Tipo de Usuário</label>
                         <select id="novoUsuarioTipo">
@@ -418,8 +356,9 @@
                     </div>
                 </div>
                 
-                <button class="btn" onclick="cadastrarUsuario()">Cadastrar Usuário</button>
+                <button class="btn" onclick="adicionarUsuario()">Adicionar Usuário</button>
                 
+                <h3 style="margin-top: 30px;">Usuários Cadastrados</h3>
                 <div class="table-container">
                     <table id="tabelaUsuarios">
                         <thead>
@@ -427,7 +366,7 @@
                                 <th>ID</th>
                                 <th>Nome</th>
                                 <th>Tipo</th>
-                                <th>Data de Cadastro</th>
+                                <th>Data de Criação</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -441,60 +380,46 @@
             <!-- Configurações -->
             <div class="module" id="configuracoes">
                 <h2>Configurações do Sistema</h2>
+                
                 <div class="form-group">
                     <label for="emailNotificacao">E-mail para Notificações</label>
-                    <input type="email" id="emailNotificacao" placeholder="E-mail para receber alertas">
+                    <input type="email" id="emailNotificacao" value="jlenon.32@outlook.com" placeholder="E-mail para receber alertas">
+                </div>
+                
+                <div class="form-group">
+                    <label for="diasAlertaVencimento">Dias para Alerta de Vencimento</label>
+                    <input type="number" id="diasAlertaVencimento" value="30" min="1" max="365">
+                </div>
+                
+                <div class="form-group">
+                    <label for="limiteEstoqueBaixo">Limite para Estoque Baixo</label>
+                    <input type="number" id="limiteEstoqueBaixo" value="10" min="1">
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="diasAlertaVencimento">Dias para Alerta de Vencimento</label>
-                        <input type="number" id="diasAlertaVencimento" min="1" max="365" placeholder="Ex: 30">
+                        <label for="backupAuto">Backup Automático</label>
+                        <select id="backupAuto">
+                            <option value="diario">Diário</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="mensal">Mensal</option>
+                            <option value="desativado">Desativado</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label for="limiteEstoqueBaixo">Limite para Estoque Baixo</label>
-                        <input type="number" id="limiteEstoqueBaixo" min="1" placeholder="Quantidade mínima">
+                        <label for="temaInterface">Tema da Interface</label>
+                        <select id="temaInterface">
+                            <option value="claro">Claro</option>
+                            <option value="escuro">Escuro</option>
+                            <option value="auto">Automático</option>
+                        </select>
                     </div>
                 </div>
                 
-                <div class="form-group">
-                    <label for="backupAuto">Backup Automático</label>
-                    <select id="backupAuto">
-                        <option value="diario">Diário</option>
-                        <option value="semanal" selected>Semanal</option>
-                        <option value="mensal">Mensal</option>
-                        <option value="desativado">Desativado</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="temaInterface">Tema da Interface</label>
-                    <select id="temaInterface">
-                        <option value="claro">Claro</option>
-                        <option value="escuro">Escuro</option>
-                        <option value="auto">Automático</option>
-                    </select>
-                </div>
-                
-                <button class="btn" onclick="salvarConfiguracoes()">Salvar Configurações</button>
-                
-                <div class="form-row" style="margin-top: 30px;">
-                    <div class="form-group">
-                        <h3>Backup de Dados</h3>
-                        <button class="btn" onclick="fazerBackup()" style="background: var(--success);">Fazer Backup Agora</button>
-                        <button class="btn" onclick="restaurarBackup()" style="background: var(--warning); margin-top: 10px;">Restaurar Backup</button>
-                    </div>
-                    
-                    <div class="form-group">
-                        <h3>Manutenção</h3>
-                        <button class="btn" onclick="limparDadosAntigos()" style="background: var(--secondary);">Limpar Dados Antigos</button>
-                        <button class="btn" onclick="recalcularEstoque()" style="background: var(--primary); margin-top: 10px;">Recalcular Valores</button>
-                    </div>
+                <div class="form-row">
+                    <button class="btn" style="flex: 1;" onclick="salvarConfiguracoes()">Salvar Configurações</button>
+                    <button class="btn" style="flex: 1; background: var(--accent);" onclick="fazerBackup()">Fazer Backup Agora</button>
                 </div>
             </div>
         </div>
     </div>
-
-    <script src="script.js"></script>
-</body>
-</html>

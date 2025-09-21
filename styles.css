@@ -381,6 +381,19 @@ tr:hover {
     border-radius: 10px;
 }
 
+.scanner-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: var(--danger);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+}
+
 .scanner-overlay {
     position: absolute;
     top: 50%;
@@ -526,6 +539,42 @@ tr:hover {
     100% { transform: rotate(360deg); }
 }
 
+.search-btn {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.search-btn:hover {
+    background: var(--secondary);
+}
+
+.tipo-scanner {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tipo-scanner-btn {
+    background: var(--secondary);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.tipo-scanner-btn.active {
+    background: var(--accent);
+}
+
 @media (max-width: 768px) {
     .sidebar {
         transform: translateX(-100%);
@@ -571,6 +620,7 @@ tr:hover {
         height: 200px;
     }
     
+    /* Overlay para fechar o menu ao clicar fora */
     .sidebar-overlay {
         display: none;
         position: fixed;

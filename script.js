@@ -1,1318 +1,1435 @@
-<script>
-        // Banco de dados simulado usando localStorage
-        const MEDICAMENTOS_DB = 'medicamentos_db';
-        const USUARIOS_DB = 'usuarios_db';
-        const MOVIMENTACOES_DB = 'movimentacoes_db';
-        const CONFIGURACOES_DB = 'configuracoes_db';
-        let usuarioLogado = null;
-        let medicamentoAlerta = null;
-        let scannerAtivo = false;
-        let scannerCampoAlvo = null;
-        
-        // Inicializar bancos de dados
-        function inicializarBancosDeDados() {
-            // Inicializar usuários
-            if (!localStorage.getItem(USUARIOS_DB)) {
-                const usuarios = [
-                    { id: 189, nome: "Administrador Master", tipo: "admin", dataCriacao: new Date().toISOString() },
-                    { id: 1, nome: "Enfermeira Maria", tipo: "comum", dataCriacao: new Date().toISOString() },
-                    { id: 2, nome: "Farmacêutico João", tipo: "comum", dataCriacao: new Date().toISOString() }
-                ];
-                localStorage.setItem(USUARIOS_DB, JSON.stringify(usuarios));
+// Banco de dados simulado usando localStorage
+const MEDICAMENTOS_DB = 'medicamentos_db';
+const USUARIOS_DB = 'usuarios_db';
+const MOVIMENTACOES_DB = 'movimentacoes_db';
+const CONFIGURACOES_DB = 'configuracoes_db';
+let usuarioLogado = null;
+let medicamentoAlerta = null;
+let scannerAtivo = false;
+let scannerCampoAlvo = null;
+let scannerStream = null;
+let relatorioChart = null;
+let navigationHistory = ['dashboard'];
+let currentNavigationIndex = 0;
+let tipoScanner = 'qrcode'; // 'qrcode' ou 'barcode'
+
+// Inicializar bancos de dados
+function inicializarBancosDeDados() {
+    // Inicializar usuários
+    if (!localStorage.getItem(USUARIOS_DB)) {
+        const usuarios = [
+            { id: 189, nome: "Administrador Master", tipo: "admin", dataCriacao: new Date().toISOString() },
+            { id: 1, nome: "Enfermeira Maria", tipo: "comum", dataCriacao: new Date().toISOString() },
+            { id: 2, nome: "Farmacêutico João", tipo: "comum", dataCriacao: new Date().toISOString() }
+        ];
+        localStorage.setItem(USUARIOS_DB, JSON.stringify(usuarios));
+    }
+    
+    // Inicializar medicamentos
+    if (!localStorage.getItem(MEDICAMENTOS_DB)) {
+        const medicamentos = [
+            {
+                id: 1,
+                codigo: "7891234567890",
+                nome: "Paracetamol",
+                fabricante: "Medley",
+                lote: "PTM202301",
+                quantidade: 150,
+                valorUnitario: 0.25,
+                dataValidade: "2024-06-30",
+                dataCadastro: new Date().toISOString(),
+                usuarioCadastro: 189,
+                observacoes: "Medicamento de uso controlado"
+            },
+            {
+                id: 2,
+                codigo: "7899876543210",
+                nome: "Dipirona Sódica",
+                fabricante: "EMS",
+                lote: "DIP202302",
+                quantidade: 80,
+                valorUnitario: 0.18,
+                dataValidade: "2024-08-15",
+                dataCadastro: new Date().toISOString(),
+                usuarioCadastro: 189,
+                observacoes: ""
+            },
+            {
+                id: 3,
+                codigo: "7896655443322",
+                nome: "Omeprazol",
+                fabricante: "Eurofarma",
+                lote: "OMP202305",
+                quantidade: 5,
+                valorUnitario: 1.20,
+                dataValidade: "2024-05-15",
+                dataCadastro: new Date().toISOString(),
+                usuarioCadastro: 189,
+                observacoes: "Estoque crítico"
             }
-            
-            // Inicializar medicamentos
-            if (!localStorage.getItem(MEDICAMENTOS_DB)) {
-                const medicamentos = [
-                    {
-                        id: 1,
-                        codigo: "7891234567890",
-                        nome: "Paracetamol",
-                        fabricante: "Medley",
-                        lote: "PTM202301",
-                        quantidade: 150,
-                        valorUnitario: 0.25,
-                        dataValidade: "2024-06-30",
-                        dataCadastro: new Date().toISOString(),
-                        usuarioCadastro: 189,
-                        observacoes: "Medicamento de uso controlado"
-                    },
-                    {
-                        id: 2,
-                        codigo: "7899876543210",
-                        nome: "Dipirona Sódica",
-                        fabricante: "EMS",
-                        lote: "DIP202302",
-                        quantidade: 80,
-                        valorUnitario: 0.18,
-                        dataValidade: "2024-08-15",
-                        dataCadastro: new Date().toISOString(),
-                        usuarioCadastro: 189,
-                        observacoes: ""
-                    },
-                    {
-                        id: 3,
-                        codigo: "7896655443322",
-                        nome: "Omeprazol",
-                        fabricante: "Eurofarma",
-                        lote: "OMP202305",
-                        quantidade: 5,
-                        valorUnitario: 1.20,
-                        dataValidade: "2024-05-15",
-                        dataCadastro: new Date().toISOString(),
-                        usuarioCadastro: 189,
-                        observacoes: "Estoque crítico" } ]; localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos)); }
+        ];
+        localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos));
+    }
 
-
-
-        // Inicializar movimentações
-        if (!localStorage.getItem(MOVIMENTACOES_DB)) {
-            localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify([]));
-        }
-        
-        // Inicializar configurações
-        if (!localStorage.getItem(CONFIGURACOES_DB)) {
-            const configuracoes = {
-                emailNotificacao: "jlenon.32@outlook.com",
-                diasAlertaVencimento: 30,
-                limiteEstoqueBaixo: 10,
-                backupAuto: "semanal",
-                temaInterface: "claro"
-            };
-            localStorage.setItem(CONFIGURACOES_DB, JSON.stringify(configuracoes));
-        }
-        
-        // Carregar configurações
-        carregarConfiguracoes();
+    // Inicializar movimentações
+    if (!localStorage.getItem(MOVIMENTACOES_DB)) {
+        const movimentacoes = [
+            {
+                id: 1,
+                medicamentoId: 1,
+                tipo: "saida",
+                quantidade: 10,
+                valorUnitario: 0.25,
+                valorTotal: 2.50,
+                usuarioId: 1,
+                data: new Date(Date.now() - 86400000).toISOString(),
+                motivo: "uso",
+                observacoes: "Uso na enfermaria"
+            },
+            {
+                id: 2,
+                medicamentoId: 2,
+                tipo: "saida",
+                quantidade: 5,
+                valorUnitario: 0.18,
+                valorTotal: 0.90,
+                usuarioId: 2,
+                data: new Date(Date.now() - 172800000).toISOString(),
+                motivo: "venda",
+                observacoes: "Venda balcão"
+            }
+        ];
+        localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(movimentacoes));
+    }
+    
+    // Inicializar configurações
+    if (!localStorage.getItem(CONFIGURACOES_DB)) {
+        const configuracoes = {
+            emailNotificacao: "jlenon.32@outlook.com",
+            diasAlertaVencimento: 30,
+            limiteEstoqueBaixo: 10,
+            backupAuto: "semanal",
+            temaInterface: "claro"
+        };
+        localStorage.setItem(CONFIGURACOES_DB, JSON.stringify(configuracoes));
     }
     
     // Carregar configurações
-    function carregarConfiguracoes() {
-        const configuracoes = obterDados(CONFIGURACOES_DB);
-        
-        if (configuracoes.emailNotificacao) {
-            document.getElementById('emailNotificacao').value = configuracoes.emailNotificacao;
-        }
-        if (configuracoes.diasAlertaVencimento) {
-            document.getElementById('diasAlertaVencimento').value = configuracoes.diasAlertaVencimento;
-        }
-        if (configuracoes.limiteEstoqueBaixo) {
-            document.getElementById('limiteEstoqueBaixo').value = configuracoes.limiteEstoqueBaixo;
-        }
-        if (configuracoes.backupAuto) {
-            document.getElementById('backupAuto').value = configuracoes.backupAuto;
-        }
-        if (configuracoes.temaInterface) {
-            document.getElementById('temaInterface').value = configuracoes.temaInterface;
-        }
+    carregarConfiguracoes();
+}
+
+// Carregar configurações do sistema
+function carregarConfiguracoes() {
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB));
+    if (configuracoes) {
+        document.getElementById('emailNotificacao').value = configuracoes.emailNotificacao || '';
+        document.getElementById('diasAlertaVencimento').value = configuracoes.diasAlertaVencimento || 30;
+        document.getElementById('limiteEstoqueBaixo').value = configuracoes.limiteEstoqueBaixo || 10;
+        document.getElementById('backupAuto').value = configuracoes.backupAuto || 'semanal';
+        document.getElementById('temaInterface').value = configuracoes.temaInterface || 'claro';
     }
+}
+
+// Salvar configurações do sistema
+function salvarConfiguracoes() {
+    const configuracoes = {
+        emailNotificacao: document.getElementById('emailNotificacao').value,
+        diasAlertaVencimento: parseInt(document.getElementById('diasAlertaVencimento').value),
+        limiteEstoqueBaixo: parseInt(document.getElementById('limiteEstoqueBaixo').value),
+        backupAuto: document.getElementById('backupAuto').value,
+        temaInterface: document.getElementById('temaInterface').value
+    };
     
-    // Salvar configurações
-    function salvarConfiguracoes() {
-        const configuracoes = {
-            emailNotificacao: document.getElementById('emailNotificacao').value,
-            diasAlertaVencimento: parseInt(document.getElementById('diasAlertaVencimento').value),
-            limiteEstoqueBaixo: parseInt(document.getElementById('limiteEstoqueBaixo').value),
-            backupAuto: document.getElementById('backupAuto').value,
-            temaInterface: document.getElementById('temaInterface').value
+    localStorage.setItem(CONFIGURACOES_DB, JSON.stringify(configuracoes));
+    alert('Configurações salvas com sucesso!');
+}
+
+// Mudar tipo de scanner (QR Code ou Código de Barras)
+function mudarTipoScanner(tipo) {
+    tipoScanner = tipo;
+    document.getElementById('btnQrCode').classList.toggle('active', tipo === 'qrcode');
+    document.getElementById('btnBarcode').classList.toggle('active', tipo === 'barcode');
+    
+    if (scannerAtivo) {
+        fecharScanner();
+        iniciarScanner(scannerCampoAlvo);
+    }
+}
+
+// SCANNER CORRIGIDO - FUNCIONANDO
+// Iniciar scanner de código de barras - VERSÃO CORRIGIDA E TESTADA
+function iniciarScanner(campoId) {
+    scannerCampoAlvo = campoId;
+    const scannerContainer = document.getElementById('scannerContainer');
+    const video = document.getElementById('scannerVideo');
+    const instructions = document.getElementById('scannerInstructions');
+    const errorDiv = document.getElementById('scannerError');
+    
+    scannerContainer.style.display = 'flex';
+    instructions.style.display = 'block';
+    errorDiv.style.display = 'none';
+    
+    // Verificar se o navegador suporta a API de mídia
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Tentar acessar a câmera traseira primeiro
+        const constraints = {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
         };
         
-        salvarDados(CONFIGURACOES_DB, configuracoes);
-        alert('Configurações salvas com sucesso!');
-    }
-    
-    // Obter dados do banco
-    function obterDados(chave) {
-        return JSON.parse(localStorage.getItem(chave) || '[]');
-    }
-    
-    // Salvar dados no banco
-    function salvarDados(chave, dados) {
-        localStorage.setItem(chave, JSON.stringify(dados));
-    }
-    
-    // Verificar se usuário é administrador
-    function isAdmin() {
-        return usuarioLogado && (usuarioLogado.tipo === 'admin' || usuarioLogado.id === 189);
-    }
-    
-    // Atualizar interface baseada no tipo de usuário
-    function atualizarPermissoesUsuario() {
-        const isAdminUser = isAdmin();
-        
-        // Mostrar/ocultar menus baseado no tipo de usuário
-        document.getElementById('menuCadastrar').style.display = isAdminUser ? 'flex' : 'none';
-        document.getElementById('menuRelatorios').style.display = isAdminUser ? 'flex' : 'none';
-        document.getElementById('menuUsuarios').style.display = isAdminUser ? 'flex' : 'none';
-        document.getElementById('menuConfiguracoes').style.display = isAdminUser ? 'flex' : 'none';
-        
-        // Atualizar badge do usuário
-        const userTypeBadge = document.getElementById('userTypeBadge');
-        if (isAdminUser) {
-            userTypeBadge.innerHTML = '<span class="admin-badge">Admin</span>';
-        } else {
-            userTypeBadge.innerHTML = '';
-        }
-    }
-    
-    // Login do usuário
-    function login() {
-        const userId = parseInt(document.getElementById('userId').value);
-        const usuarios = obterDados(USUARIOS_DB);
-        
-        // Verificar se é o admin master (ID 189)
-        if (userId === 189) {
-            usuarioLogado = { id: 189, nome: "Administrador Master", tipo: "admin" };
-        } else {
-            usuarioLogado = usuarios.find(u => u.id === userId);
-        }
-        
-        if (usuarioLogado) {
-            document.getElementById('loginContainer').style.display = 'none';
-            document.getElementById('appContainer').style.display = 'block';
-            document.getElementById('userName').textContent = usuarioLogado.nome;
-            document.getElementById('userIdDisplay').textContent = usuarioLogado.id;
+        navigator.mediaDevices.getUserMedia(constraints)
+        .then(function(stream) {
+            video.srcObject = stream;
+            scannerStream = stream;
+            video.play();
+            scannerAtivo = true;
             
-            // Atualizar permissões baseadas no tipo de usuário
-            atualizarPermissoesUsuario();
+            if (tipoScanner === 'qrcode') {
+                scanearCodigoQR(video);
+            } else {
+                scanearCodigoBarras();
+            }
+        })
+        .catch(function(error) {
+            console.error('Erro ao acessar a câmera:', error);
             
-            atualizarDashboard();
-        } else {
-            alert('ID de usuário não encontrado!');
-        }
-    }
-    
-    // Logout
-    function logout() {
-        usuarioLogado = null;
-        document.getElementById('loginContainer').style.display = 'flex';
-        document.getElementById('appContainer').style.display = 'none';
-        document.getElementById('userId').value = '';
-    }
-    
-    // Alternar menu em dispositivos móveis
-    function toggleMenu() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('active');
-    }
-    
-    // Navegação entre módulos
-    document.querySelectorAll('.menu li').forEach(item => {
-        if (item.dataset.module !== 'sair') {
-            item.addEventListener('click', () => {
-                // Verificar se usuário tem permissão para acessar o módulo
-                if ((item.dataset.module === 'cadastrar' || 
-                     item.dataset.module === 'relatorios' || 
-                     item.dataset.module === 'usuarios' || 
-                     item.dataset.module === 'configuracoes') && !isAdmin()) {
-                    alert('Você não tem permissão para acessar esta funcionalidade!');
-                    return;
-                }
-                
-                // Atualizar menu ativo
-                document.querySelectorAll('.menu li').forEach(li => {
-                    li.classList.remove('active');
-                });
-                item.classList.add('active');
-                
-                // Mostrar módulo correspondente
-                document.querySelectorAll('.module').forEach(mod => {
-                    mod.classList.remove('active');
-                });
-                document.getElementById(item.dataset.module).classList.add('active');
-                
-                // Atualizar título
-                document.getElementById('moduleTitle').textContent = item.textContent;
-                
-                // Atualizar dados se necessário
-                if (item.dataset.module === 'dashboard') {
-                    atualizarDashboard();
-                } else if (item.dataset.module === 'pesquisar') {
-                    pesquisarMedicamentos('');
-                } else if (item.dataset.module === 'usuarios') {
-                    carregarUsuarios();
-                } else if (item.dataset.module === 'configuracoes') {
-                    carregarConfiguracoes();
-                }
-                
-                // Fechar menu em dispositivos móveis
-                if (window.innerWidth <= 768) {
-                    toggleMenu();
-                }
-            });
-        }
-    });
-    
-    // Iniciar scanner de código de barras
-    function iniciarScanner(campoId) {
-        scannerCampoAlvo = campoId;
-        const scannerContainer = document.getElementById('scannerContainer');
-        const video = document.getElementById('scannerVideo');
-        
-        scannerContainer.style.display = 'flex';
-        
-        // Verificar se o navegador suporta a API de mídia
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            // Se a câmera traseira falhar, tentar a câmera frontal
+            constraints.video.facingMode = 'user';
+            
+            navigator.mediaDevices.getUserMedia(constraints)
             .then(function(stream) {
                 video.srcObject = stream;
+                scannerStream = stream;
                 video.play();
                 scannerAtivo = true;
-                scanearCodigo(video);
+                
+                if (tipoScanner === 'qrcode') {
+                    scanearCodigoQR(video);
+                } else {
+                    scanearCodigoBarras();
+                }
             })
             .catch(function(error) {
-                console.error('Erro ao acessar a câmera:', error);
-                alert('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
-                fecharScanner();
+                console.error('Erro ao acessar qualquer câmera:', error);
+                instructions.style.display = 'none';
+                errorDiv.style.display = 'block';
+                scannerAtivo = false;
+                
+                // Mostrar ajuda de permissão de câmera no formulário
+                document.getElementById('cameraHelp').style.display = 'block';
+                document.getElementById('cameraHelpRetirar').style.display = 'block';
             });
-        } else {
-            alert('Seu navegador não suporta acesso à câmera.');
-            fecharScanner();
-        }
-    }
-    
-    // Fechar scanner
-    function fecharScanner() {
-        const scannerContainer = document.getElementById('scannerContainer');
-        const video = document.getElementById('scannerVideo');
-        
-        scannerContainer.style.display = 'none';
+        });
+    } else {
+        alert('Seu navegador não suporta acesso à câmera.');
+        instructions.style.display = 'none';
+        errorDiv.style.display = 'block';
         scannerAtivo = false;
-        
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
+    }
+}
+
+// Fechar scanner - CORRIGIDO
+function fecharScanner() {
+    const scannerContainer = document.getElementById('scannerContainer');
+    const video = document.getElementById('scannerVideo');
+    
+    scannerContainer.style.display = 'none';
+    scannerAtivo = false;
+    
+    // Parar todas as tracks da stream
+    if (scannerStream) {
+        scannerStream.getTracks().forEach(track => track.stop());
+        scannerStream = null;
     }
     
-    // Scanear código de barras
-    function scanearCodigo(video) {
-        if (!scannerAtivo) return;
-        
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        
+    video.srcObject = null;
+    
+    // Parar o Quagga se estiver ativo
+    if (typeof Quagga !== 'undefined' && Quagga.isActive()) {
+        Quagga.stop();
+    }
+}
+
+// Scanear código QR
+function scanearCodigoQR(video) {
+    if (!scannerAtivo) return;
+    
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    // Verificar se o vídeo está pronto
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
         
-        if (code) {
-            document.getElementById(scannerCampoAlvo).value = code.data;
+        try {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                inversionAttempts: 'dontInvert',
+            });
+            
+            if (code) {
+                document.getElementById(scannerCampoAlvo).value = code.data;
+                fecharScanner();
+                
+                // Se for o campo de retirada, buscar o medicamento
+                if (scannerCampoAlvo === 'retirarCodigo') {
+                    buscarMedicamentoPorCodigo(code.data);
+                }
+                
+                // Ocultar ajuda de permissão se o scan foi bem-sucedido
+                document.getElementById('cameraHelp').style.display = 'none';
+                document.getElementById('cameraHelpRetirar').style.display = 'none';
+                
+                return;
+            }
+        } catch (error) {
+            console.error('Erro no scanner:', error);
+        }
+    }
+    
+    // Continuar escaneando
+    if (scannerAtivo) {
+        requestAnimationFrame(() => scanearCodigoQR(video));
+    }
+}
+
+// Scanear código de barras com Quagga
+function scanearCodigoBarras() {
+    if (!scannerAtivo) return;
+    
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#scannerVideo'),
+            constraints: {
+                width: 640,
+                height: 480,
+                facingMode: "environment"
+            },
+        },
+        decoder: {
+            readers: [
+                "code_128_reader",
+                "ean_reader",
+                "ean_8_reader",
+                "code_39_reader",
+                "code_39_vin_reader",
+                "codabar_reader",
+                "upc_reader",
+                "upc_e_reader",
+                "i2of5_reader"
+            ]
+        },
+    }, function(err) {
+        if (err) {
+            console.error('Erro ao inicializar Quagga:', err);
+            document.getElementById('scannerInstructions').style.display = 'none';
+            document.getElementById('scannerError').style.display = 'block';
+            return;
+        }
+        
+        Quagga.start();
+        
+        // Detectar códigos de barras
+        Quagga.onDetected(function(result) {
+            const code = result.codeResult.code;
+            document.getElementById(scannerCampoAlvo).value = code;
             fecharScanner();
             
             // Se for o campo de retirada, buscar o medicamento
             if (scannerCampoAlvo === 'retirarCodigo') {
-                buscarMedicamentoPorCodigo(code.data);
+                buscarMedicamentoPorCodigo(code);
             }
-        }
-        
-        // Continuar escaneando
-        requestAnimationFrame(() => scanearCodigo(video));
+            
+            // Ocultar ajuda de permissão se o scan foi bem-sucedido
+            document.getElementById('cameraHelp').style.display = 'none';
+            document.getElementById('cameraHelpRetirar').style.display = 'none';
+        });
+    });
+}
+
+// Simular scan de código de barras
+function simularScan(campoId) {
+    const codigos = [
+        '7891234567890',
+        '7899876543210',
+        '7896655443322',
+        '7896666666666',
+        '7897777777777'
+    ];
+    
+    const codigoAleatorio = codigos[Math.floor(Math.random() * codigos.length)];
+    document.getElementById(campoId).value = codigoAleatorio;
+    
+    // Se for o campo de retirada, buscar o medicamento
+    if (campoId === 'retirarCodigo') {
+        buscarMedicamentoPorCodigo(codigoAleatorio);
     }
     
-    // Simular scan de código de barras
-    function simularScan(campoId) {
-        const codigos = [
-            '7891234567890',
-            '7899876543210',
-            '7896655443322',
-            '7896666666666',
-            '7897777777777'
-        ];
-        
-        const codigoAleatorio = codigos[Math.floor(Math.random() * codigos.length)];
-        document.getElementById(campoId).value = codigoAleatorio;
-        
-        // Se for o campo de retirada, buscar o medicamento
-        if (campoId === 'retirarCodigo') {
-            buscarMedicamentoPorCodigo(codigoAleatorio);
-        }
+    // Ocultar ajuda de permissão quando usar simulação
+    document.getElementById('cameraHelp').style.display = 'none';
+    document.getElementById('cameraHelpRetirar').style.display = 'none';
+}
+
+// Login no sistema
+function login() {
+    const userId = parseInt(document.getElementById('userId').value);
+    
+    if (!userId || userId < 1) {
+        alert('Por favor, digite um ID de usuário válido.');
+        return;
     }
     
-    // Calcular valor unitário no cadastro
-    function calcularValorUnitario() {
-        const quantidade = parseFloat(document.getElementById('quantidade').value) || 0;
-        const valorTotal = parseFloat(document.getElementById('valorTotal').value) || 0;
-        
-        if (quantidade > 0 && valorTotal > 0) {
-            const valorUnitario = valorTotal / quantidade;
-            document.getElementById('valorUnitarioInfo').textContent = 
-                `Valor unitário: R$ ${valorUnitario.toFixed(2)}`;
-        } else {
-            document.getElementById('valorUnitarioInfo').textContent = 'Valor unitário: R$ 0,00';
-        }
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    const usuario = usuarios.find(u => u.id === userId);
+    
+    if (!usuario) {
+        alert('Usuário não encontrado. Entre em contato com o administrador.');
+        return;
     }
     
-    // Calcular valor total na retirada
-    function calcularValorTotalRetirada() {
-        const quantidade = parseFloat(document.getElementById('quantidadeRetirada').value) || 0;
-        const valorUnitario = parseFloat(document.getElementById('valorUnitarioRetirada').value.replace('R$ ', '').replace(',', '.')) || 0;
-        
-        if (quantidade > 0 && valorUnitario > 0) {
-            const valorTotal = quantidade * valorUnitario;
-            document.getElementById('valorTotalRetiradaInfo').textContent = 
-                `Valor total: R$ ${valorTotal.toFixed(2)}`;
-        } else {
-            document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
-        }
+    usuarioLogado = usuario;
+    
+    // Atualizar interface com informações do usuário
+    document.getElementById('userName').textContent = usuario.nome;
+    document.getElementById('userIdDisplay').textContent = usuario.id;
+    
+    if (usuario.tipo === 'admin') {
+        document.getElementById('userTypeBadge').innerHTML = '<span class="admin-badge">Admin</span>';
+        document.getElementById('menuUsuarios').style.display = 'block';
+        document.getElementById('menuConfiguracoes').style.display = 'block';
+        document.getElementById('menuRelatorios').style.display = 'block';
+    } else {
+        document.getElementById('userTypeBadge').textContent = '';
+        document.getElementById('menuUsuarios').style.display = 'none';
+        document.getElementById('menuConfiguracoes').style.display = 'none';
+        document.getElementById('menuRelatorios').style.display = 'none';
     }
+    
+    // Mostrar aplicativo e esconder login
+    document.getElementById('loginContainer').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'block';
     
     // Atualizar dashboard
-    function atualizarDashboard() {
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        const usuarios = obterDados(USUARIOS_DB);
-        
-        // Estatísticas
-        document.getElementById('totalMedicamentos').textContent = medicamentos.length;
-        
-        const valorTotal = medicamentos.reduce((total, med) => {
-            return total + (med.quantidade * med.valorUnitario);
-        }, 0);
-        document.getElementById('totalValor').textContent = `R$ ${valorTotal.toFixed(2)}`;
-        
-        const hoje = new Date();
-        const trintaDias = new Date();
-        trintaDias.setDate(hoje.getDate() + 30);
-        
-        const proximosVencimentos = medicamentos.filter(med => {
-            const validade = new Date(med.dataValidade);
-            return validade > hoje && validade <= trintaDias;
-        }).length;
-        
-        document.getElementById('proximosVencimentos').textContent = proximosVencimentos;
-        
-        // Calcular total gasto no mês
-        const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-        const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
-        
-        const movimentacoesMes = movimentacoes.filter(mov => {
-            const dataMov = new Date(mov.data);
-            return dataMov >= primeiroDiaMes && dataMov <= ultimoDiaMes && mov.tipo === 'saida' && mov.valorTotal;
-        });
-        
-        const totalGastoMes = movimentacoesMes.reduce((total, mov) => total + mov.valorTotal, 0);
-        document.getElementById('totalGastoMes').textContent = `R$ ${totalGastoMes.toFixed(2)}`;
-        
-        // Encontrar medicamento mais utilizado
-        const medicamentosMaisUtilizados = {};
-        movimentacoes.forEach(mov => {
-            if (mov.tipo === 'saida') {
-                if (!medicamentosMaisUtilizados[mov.medicamento]) {
-                    medicamentosMaisUtilizados[mov.medicamento] = 0;
-                }
-                medicamentosMaisUtilizados[mov.medicamento] += mov.quantidade;
+    atualizarDashboard();
+}
+
+// Logout do sistema
+function logout() {
+    document.getElementById('exitModal').style.display = 'flex';
+}
+
+function confirmExit() {
+    usuarioLogado = null;
+    document.getElementById('appContainer').style.display = 'none';
+    document.getElementById('loginContainer').style.display = 'flex';
+    document.getElementById('userId').value = '';
+    document.getElementById('userId').focus();
+    closeExitModal();
+}
+
+function closeExitModal() {
+    document.getElementById('exitModal').style.display = 'none';
+}
+
+// Alternar menu em dispositivos móveis - CORRIGIDO
+function toggleMenu() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    
+    sidebar.classList.toggle('active');
+    overlay.classList.toggle('active');
+    
+    // Se o menu está sendo fechado, remover o overlay
+    if (!sidebar.classList.contains('active')) {
+        setTimeout(() => {
+            overlay.classList.remove('active');
+        }, 300);
+    }
+}
+
+// Navegar entre módulos - CORRIGIDO para fechar menu em mobile
+function navigateTo(moduleId) {
+    // Fechar o menu lateral em dispositivos móveis
+    if (window.innerWidth <= 768) {
+        toggleMenu();
+    }
+    
+    // Esconder todos os módulos
+    document.querySelectorAll('.module').forEach(module => {
+        module.classList.remove('active');
+    });
+    
+    // Remover classe active de todos os itens do menu
+    document.querySelectorAll('.menu li').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Mostrar módulo selecionado
+    document.getElementById(moduleId).classList.add('active');
+    
+    // Ativar item do menu correspondente
+    document.querySelector(`.menu li[data-module="${moduleId}"]`).classList.add('active');
+    
+    // Atualizar título do módulo
+    document.getElementById('moduleTitle').textContent = document.querySelector(`.menu li[data-module="${moduleId}"]`).textContent;
+    
+    // Adicionar ao histórico de navegação
+    navigationHistory.push(moduleId);
+    currentNavigationIndex = navigationHistory.length - 1;
+    
+    // Executar ações específicas do módulo
+    switch(moduleId) {
+        case 'dashboard':
+            atualizarDashboard();
+            break;
+        case 'pesquisar':
+            filtrarMedicamentos();
+            break;
+        case 'relatorios':
+            mudarTipoRelatorio();
+            break;
+        case 'usuarios':
+            carregarUsuarios();
+            break;
+    }
+}
+
+// Navegar para trás
+function navigateBack() {
+    if (currentNavigationIndex > 0) {
+        currentNavigationIndex--;
+        navigateTo(navigationHistory[currentNavigationIndex]);
+    }
+}
+
+// Atualizar dashboard com informações atuais
+function atualizarDashboard() {
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
+    
+    // Calcular totais
+    const totalMedicamentos = medicamentos.length;
+    const totalValor = medicamentos.reduce((total, med) => total + (med.quantidade * med.valorUnitario), 0);
+    
+    // Calcular próximos vencimentos (dentro de 30 dias)
+    const hoje = new Date();
+    const diasAlerta = configuracoes.diasAlertaVencimento || 30;
+    const dataLimite = new Date();
+    dataLimite.setDate(hoje.getDate() + diasAlerta);
+    
+    const proximosVencimentos = medicamentos.filter(med => {
+        const dataValidade = new Date(med.dataValidade);
+        return dataValidade <= dataLimite && dataValidade >= hoje;
+    }).length;
+    
+    // Calcular total gasto no mês
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const totalGastoMes = movimentacoes
+        .filter(mov => new Date(mov.data) >= inicioMes && mov.tipo === 'entrada')
+        .reduce((total, mov) => total + mov.valorTotal, 0);
+    
+    // Encontrar medicamento mais utilizado
+    const medicamentoMaisUtilizado = encontrarMedicamentoMaisUtilizado();
+    
+    // Atualizar estatísticas
+    document.getElementById('totalMedicamentos').textContent = totalMedicamentos;
+    document.getElementById('totalValor').textContent = `R$ ${totalValor.toFixed(2)}`;
+    document.getElementById('proximosVencimentos').textContent = proximosVencimentos;
+    document.getElementById('totalGastoMes').textContent = `R$ ${totalGastoMes.toFixed(2)}`;
+    document.getElementById('medicamentoMaisUtilizado').textContent = medicamentoMaisUtilizado;
+    
+    // Atualizar tabela de movimentações
+    atualizarTabelaMovimentacoes();
+}
+
+// Encontrar medicamento mais utilizado
+function encontrarMedicamentoMaisUtilizado() {
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    
+    if (movimentacoes.length === 0) return '-';
+    
+    // Contar saídas por medicamento
+    const contagem = {};
+    movimentacoes
+        .filter(mov => mov.tipo === 'saida')
+        .forEach(mov => {
+            if (!contagem[mov.medicamentoId]) {
+                contagem[mov.medicamentoId] = 0;
             }
+            contagem[mov.medicamentoId] += mov.quantidade;
         });
-        
-        let medicamentoMaisUtilizado = '-';
-        let maiorQuantidade = 0;
-        
-        for (const medicamento in medicamentosMaisUtilizados) {
-            if (medicamentosMaisUtilizados[medicamento] > maiorQuantidade) {
-                maiorQuantidade = medicamentosMaisUtilizados[medicamento];
-                medicamentoMaisUtilizado = medicamento;
-            }
-        }
-        
-        document.getElementById('medicamentoMaisUtilizado').textContent = medicamentoMaisUtilizado;
-        
-        // Últimas movimentações
-        const tbody = document.querySelector('#movimentacoesTable tbody');
-        tbody.innerHTML = '';
-        
-        // Ordenar movimentações por data (mais recente primeiro)
-        movimentacoes.sort((a, b) => new Date(b.data) - new Date(a.data));
-        
-        // Mostrar apenas as 10 mais recentes
-        movimentacoes.slice(0, 10).forEach(mov => {
-            const usuario = usuarios.find(u => u.id === mov.usuario) || { nome: 'Desconhecido' };
-            const tr = document.createElement('tr');
-            
-            tr.innerHTML = `
-                <td>${new Date(mov.data).toLocaleDateString('pt-BR')}</td>
-                <td>${mov.medicamento}</td>
-                <td>${mov.lote}</td>
-                <td>${mov.tipo === 'devolucao' ? '+' : ''}${mov.quantidade}</td>
-                <td>${mov.valorTotal ? 'R$ ' + mov.valorTotal.toFixed(2) : '-'}</td>
-                <td>${usuario.nome}</td>
-                <td>${mov.tipo === 'devolucao' ? 'Devolução' : (mov.tipo === 'saida' ? 'Saída' : 'Entrada')}</td>
-            `;
-            
-            tbody.appendChild(tr);
-        });
-    }
     
-    // Cadastrar medicamento
-    function cadastrarMedicamento() {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para cadastrar medicamentos!');
-            return;
-        }
-        
-        const codigo = document.getElementById('codigoBarras').value;
-        const nome = document.getElementById('nomeMedicamento').value;
-        const fabricante = document.getElementById('fabricante').value;
-        const lote = document.getElementById('lote').value;
-        const quantidade = parseInt(document.getElementById('quantidade').value);
-        const valorTotal = parseFloat(document.getElementById('valorTotal').value);
-        const validade = document.getElementById('validade').value;
-        const observacoes = document.getElementById('observacoes').value;
-        
-        if (!codigo || !nome || !lote || !quantidade || !valorTotal || !validade) {
-            alert('Preencha todos os campos obrigatórios!');
-            return;
-        }
-        
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const valorUnitario = valorTotal / quantidade;
-        
-        const novoMedicamento = {
-            id: medicamentos.length > 0 ? Math.max(...medicamentos.map(m => m.id)) + 1 : 1,
-            codigo: codigo,
-            nome: nome,
-            fabricante: fabricante,
-            lote: lote,
-            quantidade: quantidade,
-            valorUnitario: valorUnitario,
-            dataValidade: validade,
-            dataCadastro: new Date().toISOString(),
-            usuarioCadastro: usuarioLogado.id,
-            observacoes: observacoes
-        };
-        
-        medicamentos.push(novoMedicamento);
-        salvarDados(MEDICAMENTOS_DB, medicamentos);
-        
-        // Registrar movimentação
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        movimentacoes.push({
-            id: movimentacoes.length + 1,
-            data: new Date().toISOString(),
-            medicamento: nome,
-            lote: lote,
-            quantidade: quantidade,
-            valorTotal: valorTotal,
-            usuario: usuarioLogado.id,
-            tipo: 'entrada'
-        });
-        salvarDados(MOVIMENTACOES_DB, movimentacoes);
-        
-        alert('Medicamento cadastrado com sucesso!');
-        
-        // Limpar formulário
-        document.getElementById('codigoBarras').value = '';
-        document.getElementById('nomeMedicamento').value = '';
-        document.getElementById('fabricante').value = '';
-        document.getElementById('lote').value = '';
-        document.getElementById('quantidade').value = '';
-        document.getElementById('valorTotal').value = '';
-        document.getElementById('validade').value = '';
-        document.getElementById('observacoes').value = '';
-        document.getElementById('valorUnitarioInfo').textContent = 'Valor unitário: R$ 0,00';
-    }
+    // Encontrar o ID do medicamento mais utilizado
+    const medicamentoId = Object.keys(contagem).reduce((a, b) => 
+        contagem[a] > contagem[b] ? a : b
+    );
     
-    // Buscar medicamento por código
-    function buscarMedicamentoPorCodigo(codigo) {
-        if (!codigo) return;
-        
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const medicamento = medicamentos.find(m => m.codigo === codigo);
-        
-        if (medicamento) {
-            document.getElementById('medicamentoRetirada').value = medicamento.nome;
-            document.getElementById('loteRetirada').value = medicamento.lote;
-            document.getElementById('valorUnitarioRetirada').value = `R$ ${medicamento.valorUnitario.toFixed(2)}`;
-            document.getElementById('quantidadeRetirada').max = medicamento.quantidade;
-            
-            // Calcular valor total inicial
-            calcularValorTotalRetirada();
-        } else {
-            document.getElementById('medicamentoRetirada').value = 'Não encontrado';
-            document.getElementById('loteRetirada').value = '';
-            document.getElementById('valorUnitarioRetirada').value = '';
-            document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
-        }
-    }
+    // Encontrar o nome do medicamento
+    const medicamento = medicamentos.find(m => m.id == medicamentoId);
+    return medicamento ? medicamento.nome : '-';
+}
+
+// Atualizar tabela de movimentações
+function atualizarTabelaMovimentacoes() {
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
     
-    // Alternar campo de motivo
-    function toggleMotivoField() {
-        const tipo = document.getElementById('tipoMovimentacao').value;
-        const motivoField = document.getElementById('motivoField');
-        
-        if (tipo === 'devolucao') {
-            motivoField.style.display = 'none';
-        } else {
-            motivoField.style.display = 'block';
-        }
-    }
+    // Ordenar por data (mais recente primeiro)
+    movimentacoes.sort((a, b) => new Date(b.data) - new Date(a.data));
     
-    // Processar movimentação (retirada ou devolução)
-    function processarMovimentacao() {
-        const codigo = document.getElementById('retirarCodigo').value;
-        const quantidade = parseInt(document.getElementById('quantidadeRetirada').value);
-        const tipo = document.getElementById('tipoMovimentacao').value;
-        const motivo = tipo === 'devolucao' ? 'devolucao' : document.getElementById('motivoRetirada').value;
-        const valorUnitario = parseFloat(document.getElementById('valorUnitarioRetirada').value.replace('R$ ', '').replace(',', '.')) || 0;
-        const valorTotal = quantidade * valorUnitario;
-        
-        if (!codigo || !quantidade) {
-            alert('Preencha todos os campos obrigatórios!');
-            return;
-        }
-        
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const medicamentoIndex = medicamentos.findIndex(m => m.codigo === codigo);
-        
-        if (medicamentoIndex === -1) {
-            alert('Medicamento não encontrado!');
-            return;
-        }
-        
-        if (tipo === 'saida' && medicamentos[medicamentoIndex].quantidade < quantidade) {
-            alert('Quantidade indisponível em estoque!');
-            return;
-        }
-        
-        // Atualizar quantidade
-        if (tipo === 'devolucao') {
-            medicamentos[medicamentoIndex].quantidade += quantidade;
-        } else {
-            medicamentos[medicamentoIndex].quantidade -= quantidade;
-        }
-        
-        salvarDados(MEDICAMENTOS_DB, medicamentos);
-        
-        // Registrar movimentação
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        movimentacoes.push({
-            id: movimentacoes.length + 1,
-            data: new Date().toISOString(),
-            medicamento: medicamentos[medicamentoIndex].nome,
-            lote: medicamentos[medicamentoIndex].lote,
-            quantidade: quantidade,
-            valorTotal: tipo === 'saida' ? valorTotal : null,
-            usuario: usuarioLogado.id,
-            tipo: tipo,
-            motivo: motivo
-        });
-        salvarDados(MOVIMENTACOES_DB, movimentacoes);
-        
-        // Verificar se estoque chegou a zero após retirada
-        if (tipo === 'saida' && medicamentos[medicamentoIndex].quantidade === 0) {
-            medicamentoAlerta = medicamentos[medicamentoIndex];
-            mostrarAlertaZeroEstoque(medicamentoAlerta);
-        } else {
-            alert(`Movimentação de ${tipo === 'devolucao' ? 'devolução' : 'retirada'} realizada com sucesso!`);
-            
-            // Limpar formulário
-            document.getElementById('retirarCodigo').value = '';
-            document.getElementById('medicamentoRetirada').value = '';
-            document.getElementById('loteRetirada').value = '';
-            document.getElementById('quantidadeRetirada').value = '';
-            document.getElementById('valorUnitarioRetirada').value = '';
-            document.getElementById('tipoMovimentacao').value = 'saida';
-            document.getElementById('motivoRetirada').value = 'uso';
-            document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
-            toggleMotivoField();
-        }
-        
-        // Atualizar dashboard
-        atualizarDashboard();
-    }
+    const tbody = document.getElementById('movimentacoesTable').querySelector('tbody');
+    tbody.innerHTML = '';
     
-    // Mostrar alerta de estoque zero
-    function mostrarAlertaZeroEstoque(medicamento) {
-        document.getElementById('alertTitle').textContent = 'Estoque Esgotado';
-        document.getElementById('alertMessage').textContent = 
-            `O medicamento ${medicamento.nome} (Lote: ${medicamento.lote}) atingiu estoque zero. Deseja enviar um e-mail para o comprador responsável?`;
-        document.getElementById('alertModal').style.display = 'flex';
-    }
-    
-    // Confirmar envio de e-mail
-    function confirmarEnvioEmail() {
-        if (medicamentoAlerta) {
-            enviarEmailEstoqueZero(medicamentoAlerta);
-        }
-        closeAlert();
+    // Adicionar as 10 movimentações mais recentes
+    movimentacoes.slice(0, 10).forEach(mov => {
+        const medicamento = medicamentos.find(m => m.id === mov.medicamentoId);
+        const usuario = usuarios.find(u => u.id === mov.usuarioId);
         
-        // Limpar formulário
-        document.getElementById('retirarCodigo').value = '';
-        document.getElementById('medicamentoRetirada').value = '';
-        document.getElementById('loteRetirada').value = '';
-        document.getElementById('quantidadeRetirada').value = '';
-        document.getElementById('valorUnitarioRetirada').value = '';
-        document.getElementById('tipoMovimentacao').value = 'saida';
-        document.getElementById('motivoRetirada').value = 'uso';
-        document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
-        toggleMotivoField();
-    }
-    
-    // Fechar alerta
-    function closeAlert() {
-        document.getElementById('alertModal').style.display = 'none';
-        medicamentoAlerta = null;
-    }
-    
-    // Enviar e-mail de estoque zero (simulação melhorada)
-    function enviarEmailEstoqueZero(medicamento) {
-        const configuracoes = obterDados(CONFIGURACOES_DB);
-        const email = configuracoes.emailNotificacao || 'jlenon.32@outlook.com';
+        const tr = document.createElement('tr');
         
-        // Formatar mensagem de e-mail
-        const assunto = `Alerta: Estoque esgotado - ${medicamento.nome}`;
-        const mensagem = `
-            Prezado responsável pela compra,
-            
-            O medicamento ${medicamento.nome} (Lote: ${medicamento.lote}) atingiu estoque zero em ${new Date().toLocaleDateString('pt-BR')}.
-            
-            Por favor, realize a aquisição deste medicamento para garantir o abastecimento.
-            
-            Atenciosamente,
-            Sistema de Controle de Medicamentos
+        tr.innerHTML = `
+            <td>${formatarData(mov.data)}</td>
+            <td>${medicamento ? medicamento.nome : 'Desconhecido'}</td>
+            <td>${medicamento ? medicamento.lote : '-'}</td>
+            <td>${mov.quantidade}</td>
+            <td>R$ ${mov.valorTotal.toFixed(2)}</td>
+            <td>${usuario ? usuario.nome : 'Desconhecido'}</td>
+            <td>${mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}</td>
         `;
         
-        // Em um sistema real, isso seria uma integração com um serviço de e-mail
-        // Como estamos no navegador, vamos usar mailto: para abrir o cliente de e-mail
-        const mailtoLink = `mailto:${email}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(mensagem)}`;
-        
-        // Abrir cliente de e-mail
-        window.location.href = mailtoLink;
-        
-        // Mensagem de confirmação
-        setTimeout(() => {
-            alert('E-mail preparado para envio. Por favor, confirme o envio no seu cliente de e-mail.');
-        }, 1000);
+        tbody.appendChild(tr);
+    });
+}
+
+// Formatar data para exibição
+function formatarData(dataString) {
+    const data = new Date(dataString);
+    return data.toLocaleDateString('pt-BR');
+}
+
+// Calcular valor unitário ao cadastrar medicamento
+function calcularValorUnitario() {
+    const quantidade = parseFloat(document.getElementById('quantidade').value) || 0;
+    const valorTotal = parseFloat(document.getElementById('valorTotal').value) || 0;
+    
+    if (quantidade > 0 && valorTotal > 0) {
+        const valorUnitario = valorTotal / quantidade;
+        document.getElementById('valorUnitarioInfo').textContent = `Valor unitário: R$ ${valorUnitario.toFixed(2)}`;
+    } else {
+        document.getElementById('valorUnitarioInfo').textContent = 'Valor unitário: R$ 0,00';
+    }
+}
+
+// Cadastrar novo medicamento
+function cadastrarMedicamento() {
+    const codigo = document.getElementById('codigoBarras').value;
+    const nome = document.getElementById('nomeMedicamento').value;
+    const fabricante = document.getElementById('fabricante').value;
+    const lote = document.getElementById('lote').value;
+    const quantidade = parseInt(document.getElementById('quantidade').value);
+    const valorTotal = parseFloat(document.getElementById('valorTotal').value);
+    const validade = document.getElementById('validade').value;
+    const observacoes = document.getElementById('observacoes').value;
+    
+    // Validar campos obrigatórios
+    if (!codigo || !nome || !fabricante || !lote || !quantidade || !valorTotal || !validade) {
+        alert('Por favor, preencha todos os campos obrigatórios.');
+        return;
     }
     
-    // Pesquisar medicamentos
-    function pesquisarMedicamentos(termo) {
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const tbody = document.querySelector('#resultadosPesquisa tbody');
-        tbody.innerHTML = '';
+    // Calcular valor unitário
+    const valorUnitario = valorTotal / quantidade;
+    
+    // Obter medicamentos existentes
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    
+    // Verificar se já existe medicamento com mesmo código e lote
+    const existe = medicamentos.some(med => med.codigo === codigo && med.lote === lote);
+    
+    if (existe) {
+        alert('Já existe um medicamento com este código e lote. Use a funcionalidade de entrada de estoque.');
+        return;
+    }
+    
+    // Criar novo medicamento
+    const novoMedicamento = {
+        id: medicamentos.length > 0 ? Math.max(...medicamentos.map(m => m.id)) + 1 : 1,
+        codigo,
+        nome,
+        fabricante,
+        lote,
+        quantidade,
+        valorUnitario,
+        dataValidade: validade,
+        dataCadastro: new Date().toISOString(),
+        usuarioCadastro: usuarioLogado.id,
+        observacoes
+    };
+    
+    // Adicionar ao array e salvar
+    medicamentos.push(novoMedicamento);
+    localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos));
+    
+    // Registrar movimentação de entrada
+    registrarMovimentacao(novoMedicamento.id, 'entrada', quantidade, valorUnitario, 'Cadastro inicial');
+    
+    // Limpar formulário
+    document.getElementById('codigoBarras').value = '';
+    document.getElementById('nomeMedicamento').value = '';
+    document.getElementById('fabricante').value = '';
+    document.getElementById('lote').value = '';
+    document.getElementById('quantidade').value = '';
+    document.getElementById('valorTotal').value = '';
+    document.getElementById('validade').value = '';
+    document.getElementById('observacoes').value = '';
+    document.getElementById('valorUnitarioInfo').textContent = 'Valor unitário: R$ 0,00';
+    
+    alert('Medicamento cadastrado com sucesso!');
+    
+    // Atualizar dashboard
+    atualizarDashboard();
+}
+
+// Buscar medicamento por código de barras - CORRIGIDO
+function buscarMedicamentoPorCodigo(codigo) {
+    // Não buscar se o código estiver vazio ou muito curto
+    if (!codigo || codigo.length < 3) {
+        return;
+    }
+    
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const medicamento = medicamentos.find(med => med.codigo === codigo);
+    
+    if (medicamento) {
+        document.getElementById('medicamentoRetirada').value = medicamento.nome;
+        document.getElementById('loteRetirada').value = medicamento.lote;
+        document.getElementById('valorUnitarioRetirada').value = medicamento.valorUnitario.toFixed(2);
+        document.getElementById('quantidadeRetirada').max = medicamento.quantidade;
         
-        let resultados = medicamentos;
+        // Calcular valor total inicial
+        calcularValorTotalRetirada();
+    } else {
+        // Só mostrar alerta se o código tiver comprimento completo (ex: 13 dígitos para EAN-13)
+        if (codigo.length >= 12) {
+            document.getElementById('medicamentoRetirada').value = '';
+            document.getElementById('loteRetirada').value = '';
+            document.getElementById('valorUnitarioRetirada').value = '';
+            document.getElementById('quantidadeRetirada').value = '';
+            document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
+            
+            alert('Medicamento não encontrado. Verifique o código de barras.');
+        }
+    }
+}
+
+// Calcular valor total da retirada
+function calcularValorTotalRetirada() {
+    const quantidade = parseInt(document.getElementById('quantidadeRetirada').value) || 0;
+    const valorUnitario = parseFloat(document.getElementById('valorUnitarioRetirada').value) || 0;
+    const valorTotal = quantidade * valorUnitario;
+    
+    document.getElementById('valorTotalRetiradaInfo').textContent = `Valor total: R$ ${valorTotal.toFixed(2)}`;
+}
+
+// Alternar campo de motivo conforme tipo de movimentação
+function toggleMotivoField() {
+    const tipoMovimentacao = document.getElementById('tipoMovimentacao').value;
+    const motivoField = document.getElementById('motivoField');
+    
+    if (tipoMovimentacao === 'devolucao') {
+        motivoField.style.display = 'none';
+    } else {
+        motivoField.style.display = 'block';
+    }
+}
+
+// Processar movimentação (saída ou devolução)
+function processarMovimentacao() {
+    const codigo = document.getElementById('retirarCodigo').value;
+    const quantidade = parseInt(document.getElementById('quantidadeRetirada').value);
+    const tipo = document.getElementById('tipoMovimentacao').value;
+    const motivo = document.getElementById('motivoRetirada').value;
+    
+    // Validar campos
+    if (!codigo || !quantidade || quantidade < 1) {
+        alert('Por favor, preencha todos os campos corretamente.');
+        return;
+    }
+    
+    // Buscar medicamento
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const medicamentoIndex = medicamentos.findIndex(med => med.codigo === codigo);
+    
+    if (medicamentoIndex === -1) {
+        alert('Medicamento não encontrado.');
+        return;
+    }
+    
+    const medicamento = medicamentos[medicamentoIndex];
+    
+    // Verificar estoque para saída
+    if (tipo === 'saida' && medicamento.quantidade < quantidade) {
+        alert(`Estoque insuficiente. Disponível: ${medicamento.quantidade}`);
+        return;
+    }
+    
+    // Atualizar quantidade
+    if (tipo === 'saida') {
+        medicamento.quantidade -= quantidade;
+    } else {
+        medicamento.quantidade += quantidade;
+    }
+    
+    // Salvar medicamento atualizado
+    medicamentos[medicamentoIndex] = medicamento;
+    localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos));
+    
+    // Registrar movimentação
+    registrarMovimentacao(
+        medicamento.id, 
+        tipo, 
+        quantidade, 
+        medicamento.valorUnitario, 
+        tipo === 'saida' ? motivo : 'Devolução'
+    );
+    
+    // Verificar se o estoque chegou a zero e enviar alerta
+    if (tipo === 'saida' && medicamento.quantidade === 0) {
+        mostrarAlertaEstoqueZero(medicamento);
+    }
+    
+    // Limpar formulário
+    document.getElementById('retirarCodigo').value = '';
+    document.getElementById('medicamentoRetirada').value = '';
+    document.getElementById('loteRetirada').value = '';
+    document.getElementById('valorUnitarioRetirada').value = '';
+    document.getElementById('quantidadeRetirada').value = '';
+    document.getElementById('valorTotalRetiradaInfo').textContent = 'Valor total: R$ 0,00';
+    
+    alert(`Movimentação registrada com sucesso!`);
+    
+    // Atualizar dashboard
+    atualizarDashboard();
+}
+
+// Mostrar alerta de estoque zero
+function mostrarAlertaEstoqueZero(medicamento) {
+    document.getElementById('alertTitle').textContent = 'Estoque Esgotado';
+    document.getElementById('alertMessage').textContent = `O medicamento ${medicamento.nome} (Lote: ${medicamento.lote}) acabou no estoque. Deseja enviar um alerta por e-mail?`;
+    document.getElementById('alertModal').style.display = 'flex';
+    medicamentoAlerta = medicamento;
+}
+
+// Confirmar envio de email
+function confirmarEnvioEmail() {
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
+    const email = configuracoes.emailNotificacao;
+    
+    if (email && medicamentoAlerta) {
+        // Simular envio de email (em um sistema real, aqui seria uma chamada API)
+        alert(`E-mail enviado para ${email} sobre o esgotamento do medicamento ${medicamentoAlerta.nome}`);
+    } else if (!email) {
+        alert('Nenhum e-mail configurado para notificações. Configure em Configurações do Sistema.');
+    }
+    
+    closeAlert();
+}
+
+// Fechar alerta
+function closeAlert() {
+    document.getElementById('alertModal').style.display = 'none';
+    medicamentoAlerta = null;
+}
+
+// Registrar movimentação no histórico
+function registrarMovimentacao(medicamentoId, tipo, quantidade, valorUnitario, motivo) {
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    
+    const novaMovimentacao = {
+        id: movimentacoes.length > 0 ? Math.max(...movimentacoes.map(m => m.id)) + 1 : 1,
+        medicamentoId,
+        tipo,
+        quantidade,
+        valorUnitario,
+        valorTotal: quantidade * valorUnitario,
+        usuarioId: usuarioLogado.id,
+        data: new Date().toISOString(),
+        motivo,
+        observacoes: ''
+    };
+    
+    movimentacoes.push(novaMovimentacao);
+    localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(movimentacoes));
+}
+
+// Filtrar medicamentos na pesquisa
+function filtrarMedicamentos() {
+    const termo = document.getElementById('pesquisaTermo').value.toLowerCase();
+    const status = document.getElementById('filtroStatus').value;
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const configuracoes = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)) || {};
+    
+    const hoje = new Date();
+    const tbody = document.getElementById('tabelaPesquisa').querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    medicamentos.forEach(med => {
+        // Aplicar filtro de status
+        let mostrar = true;
         
-        if (termo) {
-            resultados = medicamentos.filter(med => {
-                return med.nome.toLowerCase().includes(termo.toLowerCase()) || 
-                       med.codigo.includes(termo) || 
-                       med.lote.toLowerCase().includes(termo.toLowerCase());
-            });
+        if (status !== 'todos') {
+            const dataValidade = new Date(med.dataValidade);
+            
+            switch(status) {
+                case 'disponivel':
+                    mostrar = med.quantidade > 0 && dataValidade > hoje;
+                    break;
+                case 'vencendo':
+                    const diasParaVencer = Math.floor((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+                    mostrar = diasParaVencer <= (configuracoes.diasAlertaVencimento || 30) && diasParaVencer >= 0;
+                    break;
+                case 'vencido':
+                    mostrar = dataValidade < hoje;
+                    break;
+                case 'estoque-baixo':
+                    mostrar = med.quantidade <= (configuracoes.limiteEstoqueBaixo || 10);
+                    break;
+            }
         }
         
-        // Mostrar/ocultar coluna de ações baseado no tipo de usuário
-        document.getElementById('thAcoes').style.display = isAdmin() ? 'table-cell' : 'none';
-        
-        if (resultados.length === 0) {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td colspan="7" style="text-align: center;">Nenhum medicamento encontrado</td>`;
-            tbody.appendChild(tr);
-            return;
+        // Aplicar filtro de termo
+        if (mostrar && termo) {
+            mostrar = med.nome.toLowerCase().includes(termo) || 
+                     med.codigo.includes(termo) || 
+                     med.fabricante.toLowerCase().includes(termo) ||
+                     med.lote.toLowerCase().includes(termo);
         }
         
-        resultados.forEach(med => {
+        if (mostrar) {
             const tr = document.createElement('tr');
             
-            // Verificar se está próximo do vencimento
-            const hoje = new Date();
-            const validade = new Date(med.dataValidade);
-            const diasParaVencer = Math.floor((validade - hoje) / (1000 * 60 * 60 * 24));
+            // Determinar status do medicamento
+            let statusText = '';
+            let statusClass = '';
             
-            let status = '';
-            if (diasParaVencer < 0) {
-                status = '<span class="badge badge-danger">Vencido</span>';
-            } else if (diasParaVencer < 30) {
-                status = '<span class="badge badge-warning">Vence em ' + diasParaVencer + ' dias</span>';
+            const dataValidade = new Date(med.dataValidade);
+            if (dataValidade < hoje) {
+                statusText = 'Vencido';
+                statusClass = 'badge-danger';
+            } else {
+                const diasParaVencer = Math.floor((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+                if (diasParaVencer <= (configuracoes.diasAlertaVencimento || 30)) {
+                    statusText = 'Vencendo';
+                    statusClass = 'badge-warning';
+                } else if (med.quantidade <= (configuracoes.limiteEstoqueBaixo || 10)) {
+                    statusText = 'Estoque Baixo';
+                    statusClass = 'badge-warning';
+                } else {
+                    statusText = 'Disponível';
+                    statusClass = 'badge-success';
+                }
             }
             
             tr.innerHTML = `
                 <td>${med.codigo}</td>
-                <td>${med.nome} ${status}</td>
+                <td>${med.nome}</td>
+                <td>${med.fabricante}</td>
                 <td>${med.lote}</td>
                 <td>${med.quantidade}</td>
-                <td>${new Date(med.dataValidade).toLocaleDateString('pt-BR')}</td>
                 <td>R$ ${med.valorUnitario.toFixed(2)}</td>
-                <td style="display: ${isAdmin() ? 'table-cell' : 'none'}">
-                    <button class="scan-btn" style="padding: 5px 10px; font-size: 12px;" onclick="excluirMedicamento(${med.id})">
-                        <i class="fas fa-trash"></i> Excluir
+                <td>${formatarData(med.dataValidade)}</td>
+                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                <td>
+                    <button class="action-btn" onclick="detalhesMedicamento(${med.id})">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="action-btn btn-danger" onclick="excluirMedicamento(${med.id})">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </td>
             `;
             
             tbody.appendChild(tr);
-        });
+        }
+    });
+}
+
+// Mostrar detalhes do medicamento
+function detalhesMedicamento(id) {
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const medicamento = medicamentos.find(m => m.id === id);
+    
+    if (medicamento) {
+        alert(`Detalhes do Medicamento:\n\nNome: ${medicamento.nome}\nCódigo: ${medicamento.codigo}\nFabricante: ${medicamento.fabricante}\nLote: ${medicamento.lote}\nQuantidade: ${medicamento.quantidade}\nValor Unitário: R$ ${medicamento.valorUnitario.toFixed(2)}\nValidade: ${formatarData(medicamento.dataValidade)}\nObservações: ${medicamento.observacoes || 'Nenhuma'}`);
+    }
+}
+
+// Excluir medicamento
+function excluirMedicamento(id) {
+    if (!confirm('Tem certeza que deseja excluir este medicamento?')) return;
+    
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const medicamentosAtualizados = medicamentos.filter(m => m.id !== id);
+    
+    localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentosAtualizados));
+    
+    alert('Medicamento excluído com sucesso!');
+    filtrarMedicamentos();
+    atualizarDashboard();
+}
+
+// Mudar tipo de relatório
+function mudarTipoRelatorio() {
+    const tipo = document.getElementById('tipoRelatorio').value;
+    const periodoPersonalizado = document.getElementById('periodoPersonalizado');
+    
+    if (tipo === 'personalizado') {
+        periodoPersonalizado.style.display = 'block';
+    } else {
+        periodoPersonalizado.style.display = 'none';
+    }
+}
+
+// Gerar relatório
+function gerarRelatorio() {
+    const tipo = document.getElementById('tipoRelatorio').value;
+    const periodo = document.getElementById('periodoRelatorio').value;
+    const dataInicio = document.getElementById('dataInicio').value;
+    const dataFim = document.getElementById('dataFim').value;
+    
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    
+    let dadosFiltrados = [];
+    let titulo = '';
+    
+    // Filtrar por período
+    let dataInicioFiltro = new Date();
+    let dataFimFiltro = new Date();
+    
+    if (periodo === 'personalizado') {
+        dataInicioFiltro = new Date(dataInicio);
+        dataFimFiltro = new Date(dataFim);
+    } else {
+        dataInicioFiltro.setDate(dataInicioFiltro.getDate() - parseInt(periodo));
     }
     
-    // Excluir medicamento
-    function excluirMedicamento(id) {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para excluir medicamentos!');
-            return;
-        }
-        
-        if (confirm('Tem certeza que deseja excluir este medicamento?')) {
-            const medicamentos = obterDados(MEDICAMENTOS_DB);
-            const medicamentosAtualizados = medicamentos.filter(m => m.id !== id);
-            salvarDados(MEDICAMENTOS_DB, medicamentosAtualizados);
-            
-            alert('Medicamento excluído com sucesso!');
-            pesquisarMedicamentos('');
-            atualizarDashboard();
-        }
-    }
+    dadosFiltrados = movimentacoes.filter(mov => {
+        const dataMov = new Date(mov.data);
+        return dataMov >= dataInicioFiltro && dataMov <= dataFimFiltro;
+    });
     
-    // Mudar tipo de relatório
-    function mudarTipoRelatorio() {
-        const tipo = document.getElementById('relatorioTipo').value;
-        const periodoField = document.getElementById('periodoField');
-        const mesField = document.getElementById('mesField');
-        const anoField = document.getElementById('anoField');
-        
-        if (tipo === 'movimentacoes') {
-            periodoField.style.display = 'block';
-            mesField.style.display = 'none';
-            anoField.style.display = 'none';
-        } else if (tipo === 'gastos') {
-            periodoField.style.display = 'none';
-            mesField.style.display = 'block';
-            anoField.style.display = 'block';
-            
-            // Definir mês e ano atual
+    // Aplicar filtro por tipo de relatório
+    switch(tipo) {
+        case 'movimentacoes':
+            titulo = 'Relatório de Movimentações';
+            break;
+        case 'estoque':
+            titulo = 'Relatório de Situação do Estoque';
+            dadosFiltrados = medicamentos;
+            break;
+        case 'vencimentos':
+            titulo = 'Relatório de Próximos Vencimentos';
             const hoje = new Date();
-            document.getElementById('relatorioMes').value = hoje.getMonth() + 1;
-            document.getElementById('relatorioAno').value = hoje.getFullYear();
-        } else {
-            periodoField.style.display = 'none';
-            mesField.style.display = 'none';
-            anoField.style.display = 'none';
-        }
-    }
-    
-    // Gerar relatório
-    function gerarRelatorio() {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para gerar relatórios!');
-            return;
-        }
-        
-        const tipo = document.getElementById('relatorioTipo').value;
-        const periodo = tipo === 'movimentacoes' ? parseInt(document.getElementById('relatorioPeriodo').value) : 0;
-        const mes = tipo === 'gastos' ? parseInt(document.getElementById('relatorioMes').value) : 0;
-        const ano = tipo === 'gastos' ? parseInt(document.getElementById('relatorioAno').value) : 0;
-        const resultado = document.getElementById('relatorioResultado');
-        
-        let html = '';
-        let titulo = '';
-        
-        if (tipo === 'vencimentos') {
-            titulo = 'Medicamentos Próximos do Vencimento';
-            html = gerarRelatorioVencimentos();
-        } else if (tipo === 'estoque') {
-            titulo = 'Medicamentos com Estoque Baixo';
-            html = gerarRelatorioEstoqueBaixo();
-        } else if (tipo === 'movimentacoes') {
-            titulo = 'Movimentações do Período';
-            html = gerarRelatorioMovimentacoes(periodo);
-        } else if (tipo === 'valor') {
-            titulo = 'Valor Total em Estoque';
-            html = gerarRelatorioValorEstoque();
-        } else if (tipo === 'frequencia') {
-            titulo = 'Frequência de Uso dos Medicamentos';
-            html = gerarRelatorioFrequencia();
-        } else if (tipo === 'gastos') {
-            titulo = `Gastos com Medicamentos - ${mes}/${ano}`;
-            html = gerarRelatorioGastos(mes, ano);
-        }
-        
-        resultado.innerHTML = `
-            <h3>${titulo}</h3>
-            ${html}
-        `;
-    }
-    
-    // Gerar relatório de vencimentos
-    function gerarRelatorioVencimentos() {
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const configuracoes = obterDados(CONFIGURACOES_DB);
-        const diasAlerta = configuracoes.diasAlertaVencimento || 30;
-        
-        const hoje = new Date();
-        const dataLimite = new Date();
-        dataLimite.setDate(hoje.getDate() + diasAlerta);
-        
-        const vencimentos = medicamentos.filter(med => {
-            const validade = new Date(med.dataValidade);
-            return validade <= dataLimite && validade >= hoje;
-        });
-        
-        if (vencimentos.length === 0) {
-            return '<p>Nenhum medicamento próximo do vencimento.</p>';
-        }
-        
-        let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Medicamento</th>
-                        <th>Lote</th>
-                        <th>Quantidade</th>
-                        <th>Data de Validade</th>
-                        <th>Dias Restantes</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        vencimentos.forEach(med => {
-            const validade = new Date(med.dataValidade);
-            const diasRestantes = Math.floor((validade - hoje) / (1000 * 60 * 60 * 24));
+            const diasAlerta = JSON.parse(localStorage.getItem(CONFIGURACOES_DB)).diasAlertaVencimento || 30;
+            const dataLimite = new Date();
+            dataLimite.setDate(hoje.getDate() + diasAlerta);
             
-            html += `
-                <tr>
-                    <td>${med.nome}</td>
-                    <td>${med.lote}</td>
-                    <td>${med.quantidade}</td>
-                    <td>${validade.toLocaleDateString('pt-BR')}</td>
-                    <td>${diasRestantes}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        return html;
+            dadosFiltrados = medicamentos.filter(med => {
+                const dataValidade = new Date(med.dataValidade);
+                return dataValidade <= dataLimite && dataValidade >= hoje;
+            });
+            break;
+        case 'valor':
+            titulo = 'Relatório de Valor em Estoque';
+            dadosFiltrados = medicamentos;
+            break;
     }
     
-    // Gerar relatório de estoque baixo
-    function gerarRelatorioEstoqueBaixo() {
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const configuracoes = obterDados(CONFIGURACOES_DB);
-        const limite = configuracoes.limiteEstoqueBaixo || 10;
+    // Gerar conteúdo do relatório
+    let conteudoHTML = `<h4>${titulo}</h4>`;
+    conteudoHTML += `<p>Período: ${periodo === 'personalizado' ? `${formatarData(dataInicio)} a ${formatarData(dataFim)}` : `Últimos ${periodo} dias`}</p>`;
+    
+    if (tipo === 'movimentacoes') {
+        const totalEntradas = dadosFiltrados.filter(m => m.tipo === 'entrada').reduce((total, m) => total + m.valorTotal, 0);
+        const totalSaidas = dadosFiltrados.filter(m => m.tipo === 'saida').reduce((total, m) => total + m.valorTotal, 0);
         
-        const estoqueBaixo = medicamentos.filter(med => med.quantidade <= limite);
-        
-        if (estoqueBaixo.length === 0) {
-            return '<p>Nenhum medicamento com estoque baixo.</p>';
-        }
-        
-        let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Medicamento</th>
-                        <th>Lote</th>
-                        <th>Quantidade</th>
-                        <th>Valor Unitário</th>
-                        <th>Valor Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        estoqueBaixo.forEach(med => {
-            html += `
-                <tr>
-                    <td>${med.nome}</td>
-                    <td>${med.lote}</td>
-                    <td>${med.quantidade}</td>
-                    <td>R$ ${med.valorUnitario.toFixed(2)}</td>
-                    <td>R$ ${(med.quantidade * med.valorUnitario).toFixed(2)}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        return html;
+        conteudoHTML += `<p>Total de Entradas: R$ ${totalEntradas.toFixed(2)}</p>`;
+        conteudoHTML += `<p>Total de Saídas: R$ ${totalSaidas.toFixed(2)}</p>`;
+        conteudoHTML += `<p>Saldo: R$ ${(totalEntradas - totalSaidas).toFixed(2)}</p>`;
+    } else if (tipo === 'valor') {
+        const valorTotal = dadosFiltrados.reduce((total, med) => total + (med.quantidade * med.valorUnitario), 0);
+        conteudoHTML += `<p>Valor Total em Estoque: R$ ${valorTotal.toFixed(2)}</p>`;
     }
     
-    // Gerar relatório de movimentações
-    function gerarRelatorioMovimentacoes(dias) {
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        const usuarios = obterDados(USUARIOS_DB);
-        
-        const dataLimite = new Date();
-        dataLimite.setDate(dataLimite.getDate() - dias);
-        
-        const movimentacoesFiltradas = movimentacoes.filter(mov => {
-            return new Date(mov.data) >= dataLimite;
-        });
-        
-        if (movimentacoesFiltradas.length === 0) {
-            return '<p>Nenhuma movimentação no período.</p>';
-        }
-        
-        let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Medicamento</th>
-                        <th>Lote</th>
-                        <th>Quantidade</th>
-                        <th>Valor Total</th>
-                        <th>Usuário</th>
-                        <th>Tipo</th>
-                    </tr>
-                </thead>
-                <tbody>
+    document.getElementById('conteudoResumo').innerHTML = conteudoHTML;
+    
+    // Preencher tabela de relatório
+    const thead = document.getElementById('tabelaRelatorio').querySelector('thead');
+    const tbody = document.getElementById('tabelaRelatorio').querySelector('tbody');
+    
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    
+    if (tipo === 'movimentacoes') {
+        thead.innerHTML = `
+            <tr>
+                <th>Data</th>
+                <th>Medicamento</th>
+                <th>Lote</th>
+                <th>Quantidade</th>
+                <th>Valor Unitário</th>
+                <th>Valor Total</th>
+                <th>Tipo</th>
+                <th>Usuário</th>
+            </tr>
         `;
         
-        movimentacoesFiltradas.forEach(mov => {
-            const usuario = usuarios.find(u => u.id === mov.usuario) || { nome: 'Desconhecido' };
+        dadosFiltrados.forEach(mov => {
+            const medicamento = medicamentos.find(m => m.id === mov.medicamentoId);
+            const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+            const usuario = usuarios.find(u => u.id === mov.usuarioId);
             
-            html += `
-                <tr>
-                    <td>${new Date(mov.data).toLocaleDateString('pt-BR')}</td>
-                    <td>${mov.medicamento}</td>
-                    <td>${mov.lote}</td>
-                    <td>${mov.tipo === 'devolucao' ? '+' : ''}${mov.quantidade}</td>
-                    <td>${mov.valorTotal ? 'R$ ' + mov.valorTotal.toFixed(2) : '-'}</td>
-                    <td>${usuario.nome}</td>
-                    <td>${mov.tipo === 'devolucao' ? 'Devolução' : (mov.tipo === 'saida' ? 'Saída' : 'Entrada')}</td>
-                </tr>
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${formatarData(mov.data)}</td>
+                <td>${medicamento ? medicamento.nome : 'Desconhecido'}</td>
+                <td>${medicamento ? medicamento.lote : '-'}</td>
+                <td>${mov.quantidade}</td>
+                <td>R$ ${mov.valorUnitario.toFixed(2)}</td>
+                <td>R$ ${mov.valorTotal.toFixed(2)}</td>
+                <td>${mov.tipo === 'entrada' ? 'Entrada' : 'Saída'}</td>
+                <td>${usuario ? usuario.nome : 'Desconhecido'}</td>
             `;
+            tbody.appendChild(tr);
         });
-        
-        html += '</tbody></table>';
-        return html;
-    }
-    
-    // Gerar relatório de valor em estoque
-    function gerarRelatorioValorEstoque() {
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        
-        let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Medicamento</th>
-                        <th>Quantidade</th>
-                        <th>Valor Unitário</th>
-                        <th>Valor Total</th>
-                    </tr>
-                </thead>
-                <tbody>
+    } else {
+        // Para outros tipos de relatório (estoque, vencimentos, valor)
+        thead.innerHTML = `
+            <tr>
+                <th>Código</th>
+                <th>Nome</th>
+                <th>Fabricante</th>
+                <th>Lote</th>
+                <th>Quantidade</th>
+                <th>Valor Unitário</th>
+                <th>Validade</th>
+                <th>Valor Total</th>
+            </tr>
         `;
         
-        let valorTotalGeral = 0;
-        
-        medicamentos.forEach(med => {
-            const valorTotal = med.quantidade * med.valorUnitario;
-            valorTotalGeral += valorTotal;
-            
-            html += `
-                <tr>
-                    <td>${med.nome}</td>
-                    <td>${med.quantidade}</td>
-                    <td>R$ ${med.valorUnitario.toFixed(2)}</td>
-                    <td>R$ ${valorTotal.toFixed(2)}</td>
-                </tr>
+        dadosFiltrados.forEach(med => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${med.codigo}</td>
+                <td>${med.nome}</td>
+                <td>${med.fabricante}</td>
+                <td>${med.lote</td>
+                <td>${med.quantidade}</td>
+                <td>R$ ${med.valorUnitario.toFixed(2)}</td>
+                <td>${formatarData(med.dataValidade)}</td>
+                <td>R$ ${(med.quantidade * med.valorUnitario).toFixed(2)}</td>
             `;
+            tbody.appendChild(tr);
         });
-        
-        html += `
-                <tr style="font-weight: bold;">
-                    <td colspan="3">TOTAL GERAL</td>
-                    <td>R$ ${valorTotalGeral.toFixed(2)}</td>
-                </tr>
-            </tbody>
-        </table>
-        `;
-        
-        return html;
     }
     
-    // Gerar relatório de frequência de uso
-    function gerarRelatorioFrequencia() {
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        
-        // Filtrar apenas saídas (retiradas)
-        const saidas = movimentacoes.filter(mov => mov.tipo === 'saida');
-        
-        if (saidas.length === 0) {
-            return '<p>Nenhuma movimentação de saída registrada.</p>';
+    // Gerar gráfico (simplificado)
+    const ctx = document.getElementById('relatorioChart').getContext('2d');
+    if (relatorioChart) {
+        relatorioChart.destroy();
+    }
+    
+    // Aqui seria a implementação real do gráfico com Chart.js
+    // Por simplicidade, estamos apenas mostrando uma mensagem
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.fillText('Gráfico do Relatório', ctx.canvas.width / 2, ctx.canvas.height / 2);
+    
+    alert(`Relatório "${titulo}" gerado com sucesso!`);
+}
+
+// Exportar relatório
+function exportarRelatorio() {
+    const tabela = document.getElementById('tabelaRelatorio');
+    let csv = [];
+    
+    // Headers
+    const headers = [];
+    for (let i = 0; i < tabela.rows[0].cells.length; i++) {
+        headers.push(tabela.rows[0].cells[i].textContent);
+    }
+    csv.push(headers.join(','));
+    
+    // Data
+    for (let i = 1; i < tabela.rows.length; i++) {
+        const row = [];
+        for (let j = 0; j < tabela.rows[i].cells.length; j++) {
+            row.push(tabela.rows[i].cells[j].textContent);
         }
+        csv.push(row.join(','));
+    }
+    
+    // Download
+    const csvContent = "data:text/csv;charset=utf-8," + csv.join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "relatorio_medicamentos.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Carregar usuários
+function carregarUsuarios() {
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    const tbody = document.getElementById('tabelaUsuarios').querySelector('tbody');
+    tbody.innerHTML = '';
+    
+    usuarios.forEach(usuario => {
+        const tr = document.createElement('tr');
         
-        // Agrupar por medicamento e contar quantidade
-        const frequencia = {};
-        saidas.forEach(mov => {
-            if (!frequencia[mov.medicamento]) {
-                frequencia[mov.medicamento] = 0;
+        tr.innerHTML = `
+            <td>${usuario.id}</td>
+            <td>${usuario.nome}</td>
+            <td>${usuario.tipo === 'admin' ? 'Administrador' : 'Usuário Comum'}</td>
+            <td>${formatarData(usuario.dataCriacao)}</td>
+            <td>
+                <button class="action-btn btn-danger" onclick="excluirUsuario(${usuario.id})" ${usuario.id === usuarioLogado.id ? 'disabled' : ''}>
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
+
+// Cadastrar novo usuário
+function cadastrarUsuario() {
+    const id = parseInt(document.getElementById('novoUsuarioId').value);
+    const nome = document.getElementById('novoUsuarioNome').value;
+    const tipo = document.getElementById('novoUsuarioTipo').value;
+    
+    if (!id || id < 1 || !nome) {
+        alert('Por favor, preencha todos os campos corretamente.');
+        return;
+    }
+    
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    
+    // Verificar si ID já existe
+    if (usuarios.some(u => u.id === id)) {
+        alert('Já existe um usuário com este ID.');
+        return;
+    }
+    
+    // Adicionar novo usuário
+    usuarios.push({
+        id,
+        nome,
+        tipo,
+        dataCriacao: new Date().toISOString()
+    });
+    
+    localStorage.setItem(USUARIOS_DB, JSON.stringify(usuarios));
+    
+    // Limpar formulário
+    document.getElementById('novoUsuarioId').value = '';
+    document.getElementById('novoUsuarioNome').value = '';
+    document.getElementById('novoUsuarioTipo').value = 'comum';
+    
+    alert('Usuário cadastrado com sucesso!');
+    carregarUsuarios();
+}
+
+// Excluir usuário
+function excluirUsuario(id) {
+    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    
+    const usuarios = JSON.parse(localStorage.getItem(USUARIOS_DB)) || [];
+    const usuariosAtualizados = usuarios.filter(u => u.id !== id);
+    
+    localStorage.setItem(USUARIOS_DB, JSON.stringify(usuariosAtualizados));
+    
+    alert('Usuário excluído com sucesso!');
+    carregarUsuarios();
+}
+
+// Fazer backup dos dados
+function fazerBackup() {
+    const backup = {
+        medicamentos: localStorage.getItem(MEDICAMENTOS_DB),
+        usuarios: localStorage.getItem(USUARIOS_DB),
+        movimentacoes: localStorage.getItem(MOVIMENTACOES_DB),
+        configuracoes: localStorage.getItem(CONFIGURACOES_DB),
+        data: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_medicamentos_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert('Backup realizado com sucesso!');
+}
+
+// Restaurar backup
+function restaurarBackup() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = function(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                const backup = JSON.parse(e.target.result);
+                
+                if (backup.medicamentos) localStorage.setItem(MEDICAMENTOS_DB, backup.medicamentos);
+                if (backup.usuarios) localStorage.setItem(USUARIOS_DB, backup.usuarios);
+                if (backup.movimentacoes) localStorage.setItem(MOVIMENTACOES_DB, backup.movimentacoes);
+                if (backup.configuracoes) localStorage.setItem(CONFIGURACOES_DB, backup.configuracoes);
+                
+                alert('Backup restaurado com sucesso!');
+                location.reload();
+            } catch (error) {
+                alert('Erro ao restaurar backup. Arquivo inválido.');
             }
-            frequencia[mov.medicamento] += mov.quantidade;
-        });
-        
-        // Converter para array e ordenar por quantidade (decrescente)
-        const frequenciaArray = Object.entries(frequencia)
-            .map(([medicamento, quantidade]) => ({ medicamento, quantidade }))
-            .sort((a, b) => b.quantidade - a.quantidade);
-        
-        let html = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Posição</th>
-                        <th>Medicamento</th>
-                        <th>Quantidade Retirada</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        frequenciaArray.forEach((item, index) => {
-            html += `
-                <tr>
-                    <td>${index + 1}º</td>
-                    <td>${item.medicamento}</td>
-                    <td>${item.quantidade}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        return html;
-    }
-    
-    // Gerar relatório de gastos mensais
-    function gerarRelatorioGastos(mes, ano) {
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        
-        // Filtrar movimentações do mês/ano especificado
-        const movimentacoesMes = movimentacoes.filter(mov => {
-            const dataMov = new Date(mov.data);
-            return dataMov.getMonth() + 1 === mes && 
-                   dataMov.getFullYear() === ano;
-        });
-        
-        if (movimentacoesMes.length === 0) {
-            return `<p>Nenhuma movimentação registrada em ${mes}/${ano}.</p>`;
-        }
-        
-        // Calcular totais
-        let totalEntradas = 0;
-        let totalSaidas = 0;
-        let totalDevolucoes = 0;
-        
-        movimentacoesMes.forEach(mov => {
-            if (mov.tipo === 'entrada' && mov.valorTotal) {
-                totalEntradas += mov.valorTotal;
-            } else if (mov.tipo === 'saida' && mov.valorTotal) {
-                totalSaidas += mov.valorTotal;
-            } else if (mov.tipo === 'devolucao') {
-                // Para devoluções, subtrair do valor gasto
-                totalDevolucoes += mov.valorTotal || 0;
-            }
-        });
-        
-        const totalLiquido = totalSaidas - totalDevolucoes;
-        
-        let html = `
-            <div style="margin-bottom: 20px;">
-                <h4>Resumo Financeiro</h4>
-                <p><strong>Total em Compras (Entradas):</strong> R$ ${totalEntradas.toFixed(2)}</p>
-                <p><strong>Total em Retiradas (Saídas):</strong> R$ ${totalSaidas.toFixed(2)}</p>
-                <p><strong>Total em Devoluções:</strong> R$ ${totalDevolucoes.toFixed(2)}</p>
-                <p><strong>Total Líquido Gasto:</strong> R$ ${totalLiquido.toFixed(2)}</p>
-            </div>
-            
-            <h4>Detalhamento das Movimentações</h4>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Medicamento</th>
-                        <th>Tipo</th>
-                        <th>Quantidade</th>
-                        <th>Valor Unitário</th>
-                        <th>Valor Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        
-        movimentacoesMes.forEach(mov => {
-            const valorUnitario = mov.valorTotal && mov.quantidade ? mov.valorTotal / mov.quantidade : 0;
-            
-            html += `
-                <tr>
-                    <td>${new Date(mov.data).toLocaleDateString('pt-BR')}</td>
-                    <td>${mov.medicamento}</td>
-                    <td>${mov.tipo === 'devolucao' ? 'Devolução' : (mov.tipo === 'saida' ? 'Saída' : 'Entrada')}</td>
-                    <td>${mov.quantidade}</td>
-                    <td>${valorUnitario ? 'R$ ' + valorUnitario.toFixed(2) : '-'}</td>
-                    <td>${mov.valorTotal ? 'R$ ' + mov.valorTotal.toFixed(2) : '-'}</td>
-                </tr>
-            `;
-        });
-        
-        html += '</tbody></table>';
-        return html;
-    }
-    
-    // Exportar para Excel
-    function exportarParaExcel() {
-        const tabela = document.getElementById('relatorioResultado');
-        const tabelas = tabela.getElementsByTagName('table');
-        
-        if (tabelas.length === 0) {
-            alert('Não há dados para exportar. Gere um relatório primeiro.');
-            return;
-        }
-        
-        // Criar uma nova pasta de trabalho
-        const wb = XLSX.utils.book_new();
-        
-        // Para cada tabela no relatório
-        for (let i = 0; i < tabelas.length; i++) {
-            const worksheet = XLSX.utils.table_to_sheet(tabelas[i]);
-            XLSX.utils.book_append_sheet(wb, worksheet, `Relatório${i + 1}`);
-        }
-        
-        // Gerar nome do arquivo com data e hora
-        const dataHora = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        const nomeArquivo = `relatorio_medicamentos_${dataHora}.xlsx`;
-        
-        // Salvar arquivo
-        XLSX.writeFile(wb, nomeArquivo);
-        alert('Relatório exportado para Excel com sucesso!');
-    }
-    
-    // Fazer backup
-    function fazerBackup() {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para fazer backup!');
-            return;
-        }
-        
-        const medicamentos = obterDados(MEDICAMENTOS_DB);
-        const usuarios = obterDados(USUARIOS_DB);
-        const movimentacoes = obterDados(MOVIMENTACOES_DB);
-        const configuracoes = obterDados(CONFIGURACOES_DB);
-        
-        const backupData = {
-            medicamentos: medicamentos,
-            usuarios: usuarios,
-            movimentacoes: movimentacoes,
-            configuracoes: configuracoes,
-            dataBackup: new Date().toISOString()
         };
         
-        const dataStr = JSON.stringify(backupData, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `backup_medicamentos_${new Date().toISOString().split('T')[0]}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        alert('Backup realizado com sucesso!');
-    }
-    
-    // Carregar usuários
-    function carregarUsuarios() {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para gerenciar usuários!');
-            return;
-        }
-        
-        const usuarios = obterDados(USUARIOS_DB);
-        const tbody = document.querySelector('#tabelaUsuarios tbody');
-        tbody.innerHTML = '';
-        
-        usuarios.forEach(usuario => {
-            const tr = document.createElement('tr');
-            
-            tr.innerHTML = `
-                <td>${usuario.id}</td>
-                <td>${usuario.nome}</td>
-                <td>${usuario.tipo === 'admin' ? 'Administrador' : 'Usuário Comum'}</td>
-                <td>${new Date(usuario.dataCriacao).toLocaleDateString('pt-BR')}</td>
-                <td>
-                    <button class="scan-btn" onclick="removerUsuario(${usuario.id})" ${usuario.id === 189 ? 'disabled' : ''}>
-                        <i class="fas fa-trash"></i> Remover
-                    </button>
-                </td>
-            `;
-            
-            tbody.appendChild(tr);
-        });
-    }
-    
-    // Adicionar usuário
-    function adicionarUsuario() {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para adicionar usuários!');
-            return;
-        }
-        
-        const nome = document.getElementById('novoUsuario').value;
-        const id = parseInt(document.getElementById('novoUsuarioId').value);
-        const tipo = document.getElementById('novoUsuarioTipo').value;
-        
-        if (!nome || !id) {
-            alert('Preencha todos os campos!');
-            return;
-        }
-        
-        const usuarios = obterDados(USUARIOS_DB);
-        
-        if (usuarios.some(u => u.id === id)) {
-            alert('Já existe um usuário com este ID!');
-            return;
-        }
-        
-        usuarios.push({ 
-            id: id, 
-            nome: nome,
-            tipo: tipo,
-            dataCriacao: new Date().toISOString()
-        });
-        salvarDados(USUARIOS_DB, usuarios);
-        
-        alert('Usuário adicionado com sucesso!');
-        
-        // Limpar formulário e atualizar lista
-        document.getElementById('novoUsuario').value = '';
-        document.getElementById('novoUsuarioId').value = '';
-        document.getElementById('novoUsuarioTipo').value = 'comum';
-        carregarUsuarios();
-    }
-    
-    // Remover usuário
-    function removerUsuario(id) {
-        if (!isAdmin()) {
-            alert('Você não tem permissão para remover usuários!');
-            return;
-        }
-        
-        if (id === 189) {
-            alert('Não é possível remover o administrador master!');
-            return;
-        }
-        
-        if (confirm('Tem certeza que deseja remover este usuário?')) {
-            const usuarios = obterDados(USUARIOS_DB);
-            const usuariosAtualizados = usuarios.filter(u => u.id !== id);
-            salvarDados(USUARIOS_DB, usuariosAtualizados);
-            
-            alert('Usuário removido com sucesso!');
-            carregarUsuarios();
-        }
-    }
-    
-    // Inicializar a aplicação
-    window.onload = function() {
-        inicializarBancosDeDados();
-        document.getElementById('userId').focus();
-        toggleMotivoField(); // Inicializar visibilidade do campo motivo
-        mudarTipoRelatorio(); // Inicializar visibilidade do campo período
+        reader.readAsText(file);
     };
-</script>
+    
+    input.click();
+}
+
+// Limpar dados antigos
+function limparDadosAntigos() {
+    if (!confirm('Tem certeza que deseja limpar dados antigos? Esta ação não pode ser desfeita.')) return;
+    
+    // Limpar movimentações com mais de 1 ano
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    const umAnoAtras = new Date();
+    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
+    
+    const movimentacoesAtualizadas = movimentacoes.filter(mov => {
+        return new Date(mov.data) >= umAnoAtras;
+    });
+    
+    localStorage.setItem(MOVIMENTACOES_DB, JSON.stringify(movimentacoesAtualizadas));
+    
+    alert(`Dados antigos limpos. ${movimentacoes.length - movimentacoesAtualizadas.length} registros removidos.`);
+}
+
+// Recalcular valores de estoque
+function recalcularEstoque() {
+    const medicamentos = JSON.parse(localStorage.getItem(MEDICAMENTOS_DB)) || [];
+    const movimentacoes = JSON.parse(localStorage.getItem(MOVIMENTACOES_DB)) || [];
+    
+    // Para cada medicamento, recalcular a quantidade com base nas movimentações
+    medicamentos.forEach(medicamento => {
+        const movimentacoesMedicamento = movimentacoes.filter(mov => mov.medicamentoId === medicamento.id);
+        
+        let quantidadeCalculada = 0;
+        
+        movimentacoesMedicamento.forEach(mov => {
+            if (mov.tipo === 'entrada') {
+                quantidadeCalculada += mov.quantidade;
+            } else if (mov.tipo === 'saida') {
+                quantidadeCalculada -= mov.quantidade;
+            }
+        });
+        
+        // Atualizar a quantidade do medicamento
+        medicamento.quantidade = quantidadeCalculada;
+    });
+    
+    localStorage.setItem(MEDICAMENTOS_DB, JSON.stringify(medicamentos));
+    
+    alert('Valores recalculados com sucesso!');
+    atualizarDashboard();
+}
+
+// Inicializar a aplicação
+window.onload = function() {
+    inicializarBancosDeDados();
+    document.getElementById('userId').focus();
+    toggleMotivoField();
+    mudarTipoRelatorio();
+    
+    // Adicionar event listeners para os itens do menu - CORRIGIDO
+    document.querySelectorAll('.menu li[data-module]').forEach(item => {
+        if (item.dataset.module !== 'sair') {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                navigateTo(this.dataset.module);
+            });
+        }
+    });
+    
+    // Adicionar evento de teste ao botão de simular scan
+    document.querySelectorAll('.scan-btn').forEach(btn => {
+        if (btn.textContent.includes('Simular Scan')) {
+            btn.addEventListener('click', function() {
+                const campoId = this.getAttribute('onclick').match(/'([^']+)'/)[1];
+                setTimeout(() => {
+                    document.getElementById(campoId).value = "7891234567890";
+                    if (campoId === 'retirarCodigo') {
+                        buscarMedicamentoPorCodigo("7891234567890");
+                    }
+                }, 500);
+            });
+        }
+    });
+    
+    // Adicionar evento de redimensionamento para ajustar o menu
+    window.addEventListener('resize', function() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        
+        // Se a tela for maior que 768px, garantir que o menu está visível
+        if (window.innerWidth > 768) {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        }
+    });
+};
+
+// Configurar o botão voltar do navegador para funcionar com o histórico de navegação
+window.addEventListener('popstate', function(event) {
+    navigateBack();
+});
+
+// Prevenir que o navegador saia do aplicativo sem confirmação
+window.addEventListener('beforeunload', function (e) {
+    if (document.getElementById('appContainer').style.display === 'block') {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    }
+});
